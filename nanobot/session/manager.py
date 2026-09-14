@@ -348,6 +348,7 @@ class Session:
         max_tokens: int = 0,
         extend_to_user: bool = False,
         include_runtime_context: bool = True,
+        selected_message_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Return recent replayable messages for LLM input.
 
@@ -356,6 +357,23 @@ class Session:
         ``max_messages`` applies an additional caller-owned count limit.
         """
         replayable = self.messages[self.last_archived:]
+
+        # New feature: optionally restrict model context to the user-selected turns.
+        if selected_message_ids is not None:
+            selected = {
+                str(message_id).strip()
+                for message_id in selected_message_ids
+                if isinstance(message_id, str) and message_id.strip()
+            }
+            if selected:
+                replayable = [
+                    message
+                    for message in replayable
+                    if str(message.get("message_id", "")).strip() in selected
+                ]
+            else:
+                replayable = []
+
         if max_messages <= 0:
             start_idx = 0
         else:
@@ -395,11 +413,7 @@ class Session:
             role = message.get("role")
             if role == "assistant" and isinstance(content, str):
                 content = _sanitize_assistant_replay_text(content)
-            # Synthesize an ``[image: path]`` breadcrumb from the persisted
-            # ``media`` kwarg so LLM replay still sees *something* where the
-            # image used to be. Without this, an image-only user turn
-            # replays as an empty user message — the assistant's reply then
-            # looks like it's responding to nothing.
+
             content = content_with_media_breadcrumbs(
                 role,
                 content,
@@ -452,14 +466,10 @@ class Session:
                 used += tokens
             kept.reverse()
 
-            # Keep history aligned to the first visible user turn.
             first_user = next((i for i, m in enumerate(kept) if m.get("role") == "user"), None)
             if first_user is not None:
                 kept = kept[first_user:]
             else:
-                # Tight token budgets can otherwise leave assistant-only tails.
-                # If a user turn exists in the unsliced output, recover the
-                # nearest one even if it slightly exceeds the token budget.
                 recovered_user = next(
                     (i for i in range(len(out) - 1, -1, -1) if out[i].get("role") == "user"),
                     None,
@@ -467,7 +477,6 @@ class Session:
                 if recovered_user is not None:
                     kept = out[recovered_user:]
 
-            # And keep a legal tool-call boundary at the front.
             start = find_legal_message_start(kept)
             if start:
                 kept = kept[start:]

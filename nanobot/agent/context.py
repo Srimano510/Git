@@ -240,8 +240,22 @@ class ContextBuilder:
         runtime_context_blocks: Sequence[RuntimeContextBlock] | None = None,
         workspace: Path | None = None,
         include_memory: bool = True,
+        selected_message_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Compatibility wrapper for callers that need merged adjacent roles."""
+        if selected_message_ids is not None:
+            selected_message_ids = [
+                str(item).strip()
+                for item in selected_message_ids
+                if isinstance(item, str) and item.strip()
+            ]
+            if selected_message_ids:
+                history = [
+                    message
+                    for message in history
+                    if str(message.get("message_id", "")).strip() in selected_message_ids
+                ]
+
         messages = self.build_transcript(
             TranscriptInput(
                 history=history,

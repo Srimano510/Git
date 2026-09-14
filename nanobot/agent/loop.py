@@ -1896,7 +1896,20 @@ class AgentLoop:
             session = ctx.require_session()
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
-        ctx.history = session.get_history(extend_to_user=is_subagent)
+        selected_message_ids = ctx.msg.metadata.get("selected_message_ids")
+        if isinstance(selected_message_ids, list):
+            selected_message_ids = [
+                str(item)
+                for item in selected_message_ids
+                if isinstance(item, str) and item.strip()
+            ]
+        else:
+            selected_message_ids = None
+
+        ctx.history = session.get_history(
+            extend_to_user=is_subagent,
+            selected_message_ids=selected_message_ids,
+        )
         stored_state = session.provider_state
         subagent_followup_persisted = False
         if is_subagent:

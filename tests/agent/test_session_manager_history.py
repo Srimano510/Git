@@ -169,6 +169,22 @@ def test_get_history_does_not_replay_messages_after_full_archive():
     assert history == []
 
 
+def test_get_history_filters_to_selected_message_ids():
+    session = Session(key="test:selected")
+    session.messages.extend(
+        [
+            {"role": "user", "content": "first", "message_id": "m1"},
+            {"role": "assistant", "content": "first reply", "message_id": "m2"},
+            {"role": "user", "content": "second", "message_id": "m3"},
+            {"role": "assistant", "content": "second reply", "message_id": "m4"},
+        ]
+    )
+
+    history = session.get_history(selected_message_ids=["m1", "m4"])
+
+    assert [message["content"] for message in history] == ["first", "second reply"]
+
+
 def test_get_history_does_not_restore_archived_user_turn():
     session = Session(key="test:archived-tool-turn")
     session.messages.extend(
