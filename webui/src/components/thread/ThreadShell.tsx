@@ -15,6 +15,7 @@ import type {
   ComposerRoundUsage,
 } from "@/components/thread/ComposerUsagePopover";
 import type { ModelPresetOption } from "@/components/thread/ModelPresetBadge";
+import type { ContextStrategy } from "@/components/thread/ContextStrategyBadge";
 import { ThreadHeader } from "@/components/thread/ThreadHeader";
 import { StreamErrorNotice } from "@/components/thread/StreamErrorNotice";
 import { ThreadViewport, type ThreadViewportHandle } from "@/components/thread/ThreadViewport";
@@ -1005,6 +1006,25 @@ export function ThreadShell({
       void client.sendSystemCommand(chatId, `/model ${name}`).catch(() => {});
     }
   }, [chatId, client]);
+
+  const sessionContextStrategy = (session?.contextStrategy?.trim() || null) as ContextStrategy | null;
+  const [localContextStrategy, setLocalContextStrategy] = useState<ContextStrategy | null>(null);
+  useEffect(() => {
+    setLocalContextStrategy(null);
+  }, [session?.key, sessionContextStrategy]);
+
+  const activeContextStrategy: ContextStrategy = (
+    localContextStrategy
+    || sessionContextStrategy
+    || "linear"
+  );
+
+  const handleContextStrategyChange = useCallback((strategy: ContextStrategy) => {
+    setLocalContextStrategy(strategy);
+    if (chatId) {
+      void client.sendSystemCommand(chatId, `/context ${strategy}`).catch(() => {});
+    }
+  }, [chatId, client]);
   const modelPresetOptions = useMemo(
     () => modelPresetOptionsFromSettings(settings),
     [settings],
@@ -1573,6 +1593,8 @@ export function ThreadShell({
           modelPreset={activeModelPreset}
           modelPresets={modelPresetOptions}
           onModelPresetChange={handleModelPresetChange}
+          contextStrategy={activeContextStrategy}
+          onContextStrategyChange={handleContextStrategyChange}
           modelProvider={modelBadge.provider}
           modelProviderLabel={modelBadge.providerLabel}
           modelNeedsSetup={modelBadge.needsSetup}
@@ -1623,6 +1645,8 @@ export function ThreadShell({
           modelPreset={activeModelPreset}
           modelPresets={modelPresetOptions}
           onModelPresetChange={handleModelPresetChange}
+          contextStrategy={activeContextStrategy}
+          onContextStrategyChange={handleContextStrategyChange}
           modelProvider={modelBadge.provider}
           modelProviderLabel={modelBadge.providerLabel}
           modelNeedsSetup={modelBadge.needsSetup}

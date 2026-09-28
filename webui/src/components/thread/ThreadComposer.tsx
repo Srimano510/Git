@@ -71,6 +71,10 @@ import {
   type ModelPresetOption,
 } from "@/components/thread/ModelPresetBadge";
 import {
+  ContextStrategyBadge,
+  type ContextStrategy,
+} from "@/components/thread/ContextStrategyBadge";
+import {
   ComposerUsagePopover,
   type ComposerContextUsage,
   type ComposerRoundUsage,
@@ -198,6 +202,8 @@ interface ThreadComposerProps {
   modelPreset?: string | null;
   modelPresets?: ModelPresetOption[];
   onModelPresetChange?: (name: string) => void;
+  contextStrategy?: ContextStrategy;
+  onContextStrategyChange?: (strategy: ContextStrategy) => void;
   modelProvider?: string | null;
   modelProviderLabel?: string | null;
   modelNeedsSetup?: boolean;
@@ -898,6 +904,8 @@ export function ThreadComposer({
   modelPreset = null,
   modelPresets = [],
   onModelPresetChange,
+  contextStrategy = "linear",
+  onContextStrategyChange,
   modelProvider = null,
   modelProviderLabel = null,
   modelNeedsSetup = false,
@@ -2442,6 +2450,14 @@ export function ThreadComposer({
               isHero ? "gap-1.5" : "gap-2",
             )}
           >
+            {!voiceRecorder.isRecording ? (
+              <ContextStrategyBadge
+                strategy={contextStrategy}
+                onStrategyChange={onContextStrategyChange}
+                disabled={interactionDisabled}
+                isHero={isHero}
+              />
+            ) : null}
             {modelLabel && !voiceRecorder.isRecording ? (
               <ModelPresetBadge
                 label={modelLabel}

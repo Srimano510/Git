@@ -192,6 +192,7 @@ export async function listSessions(
     title?: string;
     preview?: string;
     model_preset?: string | null;
+    context_strategy?: string | null;
     run_started_at?: number | null;
     recovery_state?: RecoveryState | null;
     workspace_scope?: WorkspaceScopePayload | null;
@@ -213,6 +214,7 @@ export async function listSessions(
       title: s.title ?? "",
       preview: s.preview ?? "",
       modelPreset: s.model_preset ?? null,
+      contextStrategy: s.context_strategy ?? "linear",
       runStartedAt: s.run_started_at ?? null,
       recoveryState: s.recovery_state ?? null,
       workspaceScope: s.workspace_scope ?? null,

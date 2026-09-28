@@ -99,6 +99,14 @@ BUILTIN_COMMAND_SPECS: tuple[BuiltinCommandSpec, ...] = (
         accepts_args=True,
     ),
     BuiltinCommandSpec(
+        "/context",
+        "Switch context strategy",
+        "Show or switch the context strategy (linear or graph).",
+        "history",
+        "[strategy]",
+        accepts_args=True,
+    ),
+    BuiltinCommandSpec(
         "/history",
         "Show conversation history",
         "Print the last N persisted conversation messages.",
@@ -413,6 +421,46 @@ async def cmd_model(ctx: CommandContext) -> OutboundMessage:
         channel=ctx.msg.channel,
         chat_id=ctx.msg.chat_id,
         content="\n".join(lines),
+        metadata=metadata,
+    )
+
+
+async def cmd_context(ctx: CommandContext) -> OutboundMessage:
+    """Show or switch context strategy."""
+    loop = ctx.loop
+    args = ctx.args.strip().lower()
+    metadata = {**dict(ctx.msg.metadata or {}), "render_as": "text"}
+    session = ctx.session or loop.sessions.get_or_create(ctx.key)
+
+    if not args:
+        current_strategy = session.metadata.get("context_strategy", "linear")
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=(
+                f"## Context Strategy\n"
+                f"- Current strategy: `{current_strategy}`\n"
+                f"- Available strategies: `linear`, `graph`\n"
+                f"- Switch with `/context <strategy>`"
+            ),
+            metadata=metadata,
+        )
+
+    if args in {"linear", "graph", "context_graph"}:
+        strategy = "graph" if args in {"graph", "context_graph"} else "linear"
+        session.metadata["context_strategy"] = strategy
+        loop.sessions.save(session)
+        return OutboundMessage(
+            channel=ctx.msg.channel,
+            chat_id=ctx.msg.chat_id,
+            content=f"Switched context strategy to `{strategy}` for this session.",
+            metadata=metadata,
+        )
+
+    return OutboundMessage(
+        channel=ctx.msg.channel,
+        chat_id=ctx.msg.chat_id,
+        content=f"Unknown context strategy: `{args}`. Available strategies: `linear`, `graph`.",
         metadata=metadata,
     )
 
@@ -1047,6 +1095,8 @@ def register_builtin_commands(router: CommandRouter) -> None:
     router.exact("/status", cmd_status)
     router.exact("/model", cmd_model)
     router.prefix("/model ", cmd_model)
+    router.exact("/context", cmd_context)
+    router.prefix("/context ", cmd_context)
     router.exact("/history", cmd_history)
     router.prefix("/history ", cmd_history)
     router.exact("/goal", cmd_goal)

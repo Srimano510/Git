@@ -51,6 +51,7 @@ class WebUISessionProjection:
         recovery_state = recovery_state_from_metadata(metadata)
         if recovery_state is not None:
             fields["recovery_state"] = recovery_state
+        fields["context_strategy"] = str(metadata.get("context_strategy", "linear"))
         usage = LLMUsage.from_dict(metadata.get("_last_usage"))
         if usage is not None:
             fields["usage"] = usage.to_turn_dict()
