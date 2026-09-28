@@ -56,7 +56,7 @@ $env:OPENROUTER_API_KEY = "sk-or-v1-..."
 nanobot agent -m "Hello!"
 ```
 
-Environment variables set this way apply only to the current terminal. For long-running services such as systemd, Docker, LaunchAgent, or a remote shell, set the variables in that service environment before starting nanobot.
+Environment variables set this way apply only to the current terminal. For long-running services such as systemd, LaunchAgent, or a remote shell, set the variables in that service environment before starting nanobot.
 
 ## Recipe: OpenRouter Gateway
 

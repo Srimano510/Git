@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openai": {
+      "options": {
+        "baseURL": "https://api.aicredits.in/v1"
+      }
+    },
+    "anthropic": {
+      "settings": {
+        "baseURL": "https://api.aicredits.in/v1",
+        "apiKey": "sk-live-57ab74ca84d5c68ae1e7858ddde41d4a40547f780d0ebd3de2f37c06d57f904f"
+      }
+    }
+  }
+}

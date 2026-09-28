@@ -24,7 +24,7 @@ We aim to respond to security reports within 48 hours.
 # ✅ Best: Use environment variable references in config (never writes the key to disk)
 # In ~/.nanobot/config.json:
 #   "apiKey": "${ANTHROPIC_API_KEY}"
-# Then supply the key at runtime via env var or Docker secret.
+# Then supply the key at runtime via an environment variable.
 
 # ✅ Good: Store in config file with restricted permissions
 chmod 600 ~/.nanobot/config.json
@@ -86,7 +86,7 @@ On Linux, set `"tools.exec.sandbox": "bwrap"` to wrap every shell command in a [
 - System directories (`/usr`, `/bin`, `/lib`) → **read-only** (commands still work)
 - Config files and API keys (`~/.nanobot/config.json`) → **hidden** (masked by tmpfs)
 
-Requires `bwrap` installed (`apt install bubblewrap`). Pre-installed in the official Docker image. **Not available on macOS or Windows** — bubblewrap depends on Linux kernel namespaces.
+Requires `bwrap` installed (`apt install bubblewrap`). **Not available on macOS or Windows** — bubblewrap depends on Linux kernel namespaces.
 
 Enabling the sandbox also automatically activates `restrictToWorkspace` for file tools.
 
@@ -141,10 +141,10 @@ pip install --upgrade nanobot-ai
 
 For production use:
 
-1. **Isolate the Environment**
+1. **Use an Isolated Python Environment**
    ```bash
-   # Run in a container or VM
-   docker run --rm -it python:3.11
+   python3 -m venv ~/.nanobot/venv
+   . ~/.nanobot/venv/bin/activate
    pip install nanobot-ai
    ```
 

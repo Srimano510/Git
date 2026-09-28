@@ -360,4 +360,4 @@ nanobot status
 nanobot agent -m "Hello!"
 ```
 
-If these fail, use [`troubleshooting.md`](./troubleshooting.md) before debugging WebUI, chat apps, Docker, systemd, or SDK integrations.
+If these fail, use [`troubleshooting.md`](./troubleshooting.md) before debugging WebUI, chat apps, systemd, or SDK integrations.
