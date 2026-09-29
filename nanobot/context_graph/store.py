@@ -1,158 +1,123 @@
-"""Storage and persistence layer for Conversation Graphs."""
-
 from __future__ import annotations
 
-import base64
-import hashlib
 import json
-import os
-import secrets
+from hashlib import sha256
 from pathlib import Path
-from typing import Any, cast
 
-from loguru import logger
-
-from nanobot.config.paths import get_runtime_subdir
-from nanobot.context_graph.model import ChatEdge, ChatNode, ConversationGraph, EdgeType
-from nanobot.utils.helpers import ensure_dir
+from .model import ConversationGraph
 
 
 class ContextGraphStore:
-    """Manages file persistence and message-synchronization for conversation graphs."""
+    """
+    JSON persistence for ConversationGraph.
 
-    def __init__(self, root_dir: Path | None = None) -> None:
-        self.root_dir = (
-            Path(root_dir).expanduser().resolve(strict=False)
-            if root_dir is not None
-            else get_runtime_subdir("context-graphs").resolve(strict=False)
+    Persistence failures must not break ordinary chat.
+    """
+
+    def __init__(self, root: Path | None = None, *, root_dir: Path | None = None):
+        if root is not None and root_dir is not None:
+            raise TypeError("provide either root or root_dir, not both")
+        self.root = root if root is not None else root_dir
+        if self.root is None:
+            raise TypeError("root is required")
+
+    def graph_path(
+        self,
+        workspace_id: str,
+        graph_id: str,
+    ) -> Path:
+        directory = self.root / workspace_id
+        directory.mkdir(
+            parents=True,
+            exist_ok=True,
         )
-        ensure_dir(self.root_dir)
+
+        return directory / f"{graph_id}.json"
+
+    def save(
+        self,
+        graph: ConversationGraph,
+        workspace_id: str,
+    ) -> Path | None:
+        try:
+            path = self.graph_path(
+                workspace_id,
+                graph.graph_id,
+            )
+
+            temp_path = path.with_suffix(".tmp")
+
+            temp_path.write_text(
+                json.dumps(
+                    graph.to_dict(),
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            temp_path.replace(path)
+
+            return path
+
+        except OSError:
+            return None
+
+    def load(
+        self,
+        workspace_id: str,
+        graph_id: str,
+    ) -> ConversationGraph | None:
+        try:
+            path = self.graph_path(
+                workspace_id,
+                graph_id,
+            )
+
+            if not path.exists():
+                return None
+
+            data = json.loads(
+                path.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            return ConversationGraph.from_dict(data)
+
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return None
 
     @staticmethod
-    def storage_key(session_key: str) -> str:
-        """Derive a filesystem-safe filename stem for a given session key."""
-        return base64.urlsafe_b64encode(session_key.encode()).decode().rstrip("=")
-
-    def get_graph_path(self, session_key: str) -> Path:
-        """Return the target JSON file path for a session's conversation graph."""
-        return self.root_dir / f"{self.storage_key(session_key)}.json"
-
-    def load_graph(self, session_key: str) -> ConversationGraph:
-        """Load a conversation graph from disk, or return a new empty graph if none exists."""
-        path = self.get_graph_path(session_key)
-        if not path.exists():
-            return ConversationGraph(metadata={"session_key": session_key})
-
-        try:
-            with open(path, encoding="utf-8") as f:
-                content = f.read()
-                return ConversationGraph.from_json(content)
-        except Exception as exc:
-            logger.warning("Failed to load context graph for session {}: {}", session_key, exc)
-            return ConversationGraph(metadata={"session_key": session_key})
+    def _legacy_graph_id(session_key: str) -> str:
+        return "graph_" + sha256(session_key.encode("utf-8")).hexdigest()
 
     def save_graph(self, session_key: str, graph: ConversationGraph) -> bool:
-        """Persist a conversation graph to disk atomically."""
-        path = self.get_graph_path(session_key)
-        tmp_path = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
-        try:
-            ensure_dir(self.root_dir)
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                f.write(graph.to_json())
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_path, path)
-            return True
-        except Exception as exc:
-            logger.warning("Failed to save context graph for session {}: {}", session_key, exc)
-            return False
-        finally:
-            tmp_path.unlink(missing_ok=True)
+        graph.graph_id = self._legacy_graph_id(session_key)
+        graph.metadata.setdefault("session_key", session_key)
+        return self.save(graph, "legacy_sessions") is not None
 
-    @staticmethod
-    def _derive_node_id(session_key: str, index: int, message: dict[str, Any]) -> str:
-        """Generate a deterministic node ID for a session message."""
-        turn_id = message.get("turn_id")
-        msg_id = message.get("id") or message.get("message_id")
-        if msg_id:
-            return f"node_{msg_id}"
-        if turn_id:
-            role = message.get("role", "msg")
-            return f"node_{turn_id}_{role}_{index}"
-        content = str(message.get("content", ""))
-        digest = hashlib.sha256(f"{session_key}:{index}:{content}".encode()).hexdigest()[:12]
-        return f"node_{digest}"
+    def load_graph(self, session_key: str) -> ConversationGraph:
+        graph_id = self._legacy_graph_id(session_key)
+        graph = self.load("legacy_sessions", graph_id)
+        return graph or ConversationGraph(
+            graph_id=graph_id,
+            metadata={"session_key": session_key},
+        )
 
     def sync_session_messages(
         self,
         session_key: str,
-        messages: list[dict[str, Any]],
+        messages: list[dict[str, object]],
         graph: ConversationGraph | None = None,
     ) -> ConversationGraph:
-        """
-        Synchronize a list of session replay messages into the graph idempotently.
-        Preserves existing nodes/edges and appends missing messages.
-        """
-        if graph is None:
-            graph = self.load_graph(session_key)
+        from nanobot.context_graph.sync import synchronize_session
 
-        prev_node_id: str | None = None
-        # Find the last node if graph already has nodes
-        if graph.nodes:
-            # Look for existing node with the highest message index
-            indexed_nodes = [
-                node for node in graph.nodes.values()
-                if node.session_key == session_key and node.session_message_index is not None
-            ]
-            if indexed_nodes:
-                indexed_nodes.sort(key=lambda n: n.session_message_index or 0)
-                prev_node_id = indexed_nodes[-1].id
-
-        for idx, msg in enumerate(messages):
-            node_id = self._derive_node_id(session_key, idx, msg)
-            if node_id not in graph.nodes:
-                role = str(msg.get("role", "user"))
-                content = str(msg.get("content", ""))
-                turn_id = msg.get("turn_id")
-                timestamp = msg.get("timestamp") or msg.get("created_at")
-                ts = float(timestamp) if isinstance(timestamp, (int, float)) else None
-
-                node = ChatNode(
-                    id=node_id,
-                    role=role,
-                    content=content,
-                    timestamp=ts or (0.0 if ts is not None else float(idx)),
-                    session_key=session_key,
-                    session_message_index=idx,
-                    turn_id=str(turn_id) if turn_id else None,
-                    metadata={
-                        k: v for k, v in msg.items()
-                        if k not in {"role", "content", "turn_id", "timestamp"}
-                    },
-                )
-                graph.add_node(node)
-
-                if prev_node_id and prev_node_id != node_id:
-                    # Check if edge already exists
-                    edge_exists = any(
-                        edge.source == prev_node_id and edge.target == node_id
-                        for edge in graph.edges
-                    )
-                    if not edge_exists:
-                        edge_type = EdgeType.REPLY.value
-                        graph.add_edge(ChatEdge(source=prev_node_id, target=node_id, type=edge_type))
-
-            prev_node_id = node_id
-
-        return graph
-
-
-_default_store: ContextGraphStore | None = None
-
-
-def get_context_graph_store() -> ContextGraphStore:
-    """Get the default process-wide context graph store."""
-    global _default_store
-    if _default_store is None:
-        _default_store = ContextGraphStore()
-    return _default_store
+        graph_obj = graph or self.load_graph(session_key)
+        synchronize_session(
+            graph_obj,
+            session_key=session_key,
+            messages=messages,
+        )
+        self.save_graph(session_key, graph_obj)
+        return graph_obj

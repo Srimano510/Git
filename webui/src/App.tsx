@@ -1553,6 +1553,7 @@ function Shell({
   const onForkChat = useCallback(async (
     sourceChatId: string,
     beforeUserIndex: number,
+    includeUserMessage = false,
   ) => {
     try {
       const sourceSession = sessions.find((session) => session.chatId === sourceChatId);
@@ -1563,6 +1564,7 @@ function Shell({
         sourceChatId,
         beforeUserIndex,
         t("chat.forkTitle", { title: sourceTitle }),
+        includeUserMessage,
       );
       navigate({
         view: "chat",

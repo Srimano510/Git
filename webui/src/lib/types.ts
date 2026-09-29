@@ -1561,7 +1561,13 @@ export type Outbound =
       action: string;
       payload: Record<string, unknown>;
     }
-  | { type: "fork_chat"; source_chat_id: string; before_user_index: number; title?: string }
+  | {
+      type: "fork_chat";
+      source_chat_id: string;
+      before_user_index: number;
+      include_user_message?: boolean;
+      title?: string;
+    }
   | { type: "attach"; chat_id: string }
   | { type: "set_sidebar_state"; state: SidebarStatePayload }
   | { type: "discard_temporary_chat"; chat_id: string }

@@ -8,13 +8,72 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from nanobot.config.paths import get_data_dir
 from nanobot.context_graph.model import ConversationGraph
 from nanobot.context_graph.observability import ContextResult
-from nanobot.context_graph.store import ContextGraphStore, get_context_graph_store
+from nanobot.context_graph.store import ContextGraphStore
+from nanobot.context_graph.sync import (
+    FORK_BOUNDARY_METADATA_KEY,
+    FORK_CHILD_SESSION_METADATA_KEY,
+    FORK_SOURCE_SESSION_METADATA_KEY,
+    GRAPH_ID_METADATA_KEY,
+    graph_id_for_session,
+    synchronize_session,
+)
 from nanobot.utils.helpers import estimate_message_tokens
 
 if TYPE_CHECKING:
     from nanobot.session.manager import Session
+
+
+_SESSION_GRAPH_NAMESPACE = "sessions"
+
+
+def _default_graph_store() -> ContextGraphStore:
+    return ContextGraphStore(root=get_data_dir() / "context_graph")
+
+
+def _sync_session_graph(
+    session: Session,
+    store: ContextGraphStore,
+    graph: ConversationGraph | None = None,
+) -> tuple[ConversationGraph, list[str], float, int]:
+    sync_started = time.perf_counter()
+    graph_id = graph.graph_id if graph is not None else session.metadata.get(GRAPH_ID_METADATA_KEY)
+    if not isinstance(graph_id, str) or not graph_id:
+        graph_id = graph_id_for_session(session.key)
+    graph_obj = graph or store.load(_SESSION_GRAPH_NAMESPACE, graph_id)
+    if graph_obj is None:
+        graph_obj = ConversationGraph(graph_id=graph_id)
+    branch_count_before = graph_obj.branch_count()
+
+    source_session = session.metadata.get(FORK_SOURCE_SESSION_METADATA_KEY)
+    child_session = session.metadata.get(FORK_CHILD_SESSION_METADATA_KEY)
+    fork_boundary = session.metadata.get(FORK_BOUNDARY_METADATA_KEY)
+    if child_session != session.key:
+        source_session = None
+        fork_boundary = None
+
+    nodes = synchronize_session(
+        graph_obj,
+        session_key=session.key,
+        messages=session.messages,
+        source_session=source_session if isinstance(source_session, str) else None,
+        fork_boundary=fork_boundary if isinstance(fork_boundary, int) else None,
+    )
+    saved_path = store.save(graph_obj, _SESSION_GRAPH_NAMESPACE)
+    sync_ms = (time.perf_counter() - sync_started) * 1000
+    branches_added = graph_obj.branch_count() - branch_count_before
+    if saved_path is None:
+        logger.warning("Context graph persistence failed for graph {}", graph_obj.graph_id)
+    if branches_added:
+        logger.info(
+            "Added {} context-graph branch edge(s); total={}, sync_ms={:.2f}",
+            branches_added,
+            graph_obj.branch_count(),
+            sync_ms,
+        )
+    return graph_obj, [node.id for node in nodes], sync_ms, branches_added
 
 
 class ContextEngineBase(ABC):
@@ -67,13 +126,15 @@ class LinearContextEngine(ContextEngineBase):
 
         token_count = sum(estimate_message_tokens(msg) for msg in history)
         elapsed_ms = (time.perf_counter() - started) * 1000
+        graph_sync_ms = 0.0
+        branch_count = 0
 
         # Optionally synchronize session messages into the graph store for persistence
-        if store is not None or kwargs.get("persist_graph", True):
-            graph_store = store or get_context_graph_store()
+        if kwargs.get("persist_graph", True):
+            graph_store = store or _default_graph_store()
             try:
-                graph_obj = graph_store.sync_session_messages(session.key, session.messages, graph)
-                graph_store.save_graph(session.key, graph_obj)
+                graph_obj, _, graph_sync_ms, _ = _sync_session_graph(session, graph_store, graph)
+                branch_count = graph_obj.branch_count()
             except Exception as exc:
                 logger.debug("Non-fatal graph sync failure in LinearContextEngine: {}", exc)
 
@@ -87,6 +148,8 @@ class LinearContextEngine(ContextEngineBase):
             diagnostics={
                 "message_count": len(history),
                 "window_size": effective_max,
+                "branch_count": branch_count,
+                "graph_sync_ms": graph_sync_ms,
             },
         )
 
@@ -116,11 +179,16 @@ class GraphContextEngine(ContextEngineBase):
         started = time.perf_counter()
         logger.debug("Using GraphContextEngine (Phase 1 baseline delegation)")
 
-        graph_store = store or get_context_graph_store()
+        graph_store = store or _default_graph_store()
+        graph_obj: ConversationGraph | None = None
+        graph_sync_ms = 0.0
+        branches_added = 0
         try:
-            graph_obj = graph_store.sync_session_messages(session.key, session.messages, graph)
-            graph_store.save_graph(session.key, graph_obj)
-            node_ids = list(graph_obj.nodes.keys())
+            graph_obj, node_ids, graph_sync_ms, branches_added = _sync_session_graph(
+                session,
+                graph_store,
+                graph,
+            )
         except Exception as exc:
             logger.warning("Graph sync failed in GraphContextEngine: {}", exc)
             node_ids = []
@@ -149,8 +217,11 @@ class GraphContextEngine(ContextEngineBase):
             diagnostics={
                 "phase": 1,
                 "mode": "graph_baseline_delegation",
-                "total_graph_nodes": len(node_ids),
+                "total_graph_nodes": len(graph_obj.nodes) if graph_obj is not None else 0,
                 "retrieved_messages": len(result.messages),
+                "branch_count": graph_obj.branch_count() if graph_obj is not None else 0,
+                "branches_added": branches_added,
+                "graph_sync_ms": graph_sync_ms,
             },
         )
 

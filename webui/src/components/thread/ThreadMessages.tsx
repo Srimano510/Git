@@ -20,7 +20,7 @@ interface ThreadMessagesProps {
   slashCommands?: SlashCommand[];
   forkBoundaryMessageCount?: number | null;
   onOpenFilePreview?: (path: string) => void;
-  onForkFromMessage?: (beforeUserIndex: number) => void;
+  onForkFromMessage?: (beforeUserIndex: number, includeUserMessage?: boolean) => void;
   onQuoteSelection?: (text: string) => void;
 }
 
@@ -124,9 +124,22 @@ export function ThreadMessages({
             ? unit.message.id
             : undefined;
         const forkIndex =
-          unit.type === "message" && unit.message.role === "assistant" && forkFlags[index]
+          unit.type === "message"
+          && (
+            (unit.message.role === "assistant" && forkFlags[index])
+            || (
+              unit.message.role === "user"
+              && unit.message.deliveryStatus !== "failed"
+              && unit.message.deliveryStatus !== "sending"
+            )
+          )
             ? nextUserIndex
             : undefined;
+        const forkIncludesUserMessage =
+          unit.type === "message"
+          && unit.message.role === "user"
+          && unit.message.deliveryStatus !== "failed"
+          && unit.message.deliveryStatus !== "sending";
         if (
           unit.type === "message"
           && unit.message.role === "user"
@@ -152,6 +165,7 @@ export function ThreadMessages({
                   )
             }
             forkIndex={forkIndex}
+            forkIncludesUserMessage={forkIncludesUserMessage}
             showForkBoundary={index === forkBoundaryAfterUnitIndex}
             forkBoundaryLabel={t("thread.forkedFromHistory")}
             temporary={temporary}
@@ -241,7 +255,8 @@ interface ThreadDisplayUnitProps {
   mcpPresets: McpPresetInfo[];
   slashCommands: SlashCommand[];
   onOpenFilePreview?: (path: string) => void;
-  onForkFromMessage?: (beforeUserIndex: number) => void;
+  onForkFromMessage?: (beforeUserIndex: number, includeUserMessage?: boolean) => void;
+  forkIncludesUserMessage: boolean;
 }
 
 const ThreadDisplayUnit = memo(function ThreadDisplayUnit({
@@ -253,6 +268,7 @@ const ThreadDisplayUnit = memo(function ThreadDisplayUnit({
   deferOffscreenRender,
   isTurnStreaming,
   forkIndex,
+  forkIncludesUserMessage,
   showForkBoundary,
   forkBoundaryLabel,
   temporary,
@@ -270,8 +286,10 @@ const ThreadDisplayUnit = memo(function ThreadDisplayUnit({
   const stableDeferOffscreenRender =
     deferOffscreenRender && !hasRenderedEagerlyRef.current;
   const onForkFromHere = useCallback(() => {
-    if (forkIndex !== undefined) onForkFromMessage?.(forkIndex);
-  }, [forkIndex, onForkFromMessage]);
+    if (forkIndex === undefined) return;
+    if (forkIncludesUserMessage) onForkFromMessage?.(forkIndex, true);
+    else onForkFromMessage?.(forkIndex);
+  }, [forkIncludesUserMessage, forkIndex, onForkFromMessage]);
   return (
     <>
       <div
@@ -299,7 +317,7 @@ const ThreadDisplayUnit = memo(function ThreadDisplayUnit({
             mcpPresets={mcpPresets}
             slashCommands={slashCommands}
             onOpenFilePreview={onOpenFilePreview}
-            onForkFromHere={forkIndex !== undefined ? onForkFromHere : undefined}
+            onForkFromHere={forkIndex !== undefined && !isTurnStreaming ? onForkFromHere : undefined}
           />
         )}
       </div>
@@ -320,6 +338,7 @@ function threadDisplayUnitPropsEqual(
     && previous.deferOffscreenRender === next.deferOffscreenRender
     && previous.isTurnStreaming === next.isTurnStreaming
     && previous.forkIndex === next.forkIndex
+    && previous.forkIncludesUserMessage === next.forkIncludesUserMessage
     && previous.showForkBoundary === next.showForkBoundary
     && previous.forkBoundaryLabel === next.forkBoundaryLabel
     && previous.temporary === next.temporary

@@ -932,6 +932,7 @@ export class NanobotClient {
     beforeUserIndex: number,
     title?: string,
     timeoutMs: number = 5_000,
+    includeUserMessage = false,
   ): Promise<string> {
     if (this.pendingNewChat) {
       return Promise.reject(new Error("newChat already in flight"));
@@ -946,6 +947,7 @@ export class NanobotClient {
         type: "fork_chat",
         source_chat_id: sourceChatId,
         before_user_index: beforeUserIndex,
+        ...(includeUserMessage ? { include_user_message: true } : {}),
         ...(title?.trim() ? { title: title.trim() } : {}),
       });
     });

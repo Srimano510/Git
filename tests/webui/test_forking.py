@@ -87,6 +87,39 @@ def test_create_fork_stops_before_transcript_work_when_source_is_invalid(
     fork_transcript.assert_not_called()
 
 
+def test_create_fork_can_include_selected_user_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    forked = SimpleNamespace(messages=[{"role": "user", "content": "prompt"}], metadata={})
+    manager = MagicMock()
+    manager.fork_session_before_user_index.return_value = forked
+    fork_transcript = MagicMock(return_value=True)
+    monkeypatch.setattr(forking.uuid, "uuid4", lambda: "fork-id")
+    monkeypatch.setattr(forking, "fork_transcript_before_user_index", fork_transcript)
+    monkeypatch.setattr(forking, "append_fork_marker", MagicMock())
+
+    result = forking.create_webui_chat_fork(
+        manager,
+        source_chat_id="source",
+        before_user_index=1,
+        include_user_message=True,
+    )
+
+    assert result == ("fork-id", "websocket:fork-id")
+    manager.fork_session_before_user_index.assert_called_once_with(
+        "websocket:source",
+        "websocket:fork-id",
+        1,
+        include_user_message=True,
+    )
+    fork_transcript.assert_called_once_with(
+        "websocket:source",
+        "websocket:fork-id",
+        1,
+        include_user_message=True,
+    )
+
+
 @pytest.mark.parametrize(
     ("envelope", "detail"),
     [

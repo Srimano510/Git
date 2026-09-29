@@ -1622,6 +1622,23 @@ describe("ThreadMessages", () => {
     expect(onForkFromMessage).toHaveBeenCalledWith(2);
   });
 
+  it("branches from a persisted user message including that prompt", () => {
+    const onForkFromMessage = vi.fn();
+    render(
+      <ThreadMessages
+        messages={[
+          { id: "u1", role: "user", content: "branch here", createdAt: 1 },
+          { id: "a1", role: "assistant", content: "original answer", createdAt: 2 },
+        ]}
+        isStreaming={false}
+        onForkFromMessage={onForkFromMessage}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Fork" })[0]);
+    expect(onForkFromMessage).toHaveBeenCalledWith(0, true);
+  });
+
   it("uses turn ids as activity grouping boundaries when available", () => {
     const units = buildDisplayUnits([
       { id: "u1", role: "user", content: "one", turnId: "turn-1", createdAt: 1 },

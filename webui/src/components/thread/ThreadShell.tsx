@@ -395,7 +395,11 @@ interface ThreadShellProps {
     initialMessage?: string,
     modelPreset?: string | null,
   ) => Promise<string | null>;
-  onForkChat?: (sourceChatId: string, beforeUserIndex: number) => Promise<string | null>;
+  onForkChat?: (
+    sourceChatId: string,
+    beforeUserIndex: number,
+    includeUserMessage?: boolean,
+  ) => Promise<string | null>;
   onTurnEnd?: () => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
@@ -1551,9 +1555,11 @@ export function ThreadShell({
   }, [filePreviewPath]);
 
   const handleForkFromMessage = useCallback(
-    async (beforeUserIndex: number) => {
+    async (beforeUserIndex: number, includeUserMessage = false) => {
       if (!chatId || !onForkChat) return;
-      const forkedChatId = await onForkChat(chatId, beforeUserIndex);
+      const forkedChatId = includeUserMessage
+        ? await onForkChat(chatId, beforeUserIndex, true)
+        : await onForkChat(chatId, beforeUserIndex);
       if (!forkedChatId) return;
       messageCacheRef.current.delete(forkedChatId);
       pendingCanonicalHydrateRef.current.delete(forkedChatId);

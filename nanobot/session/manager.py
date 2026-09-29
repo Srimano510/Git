@@ -68,6 +68,9 @@ _FORK_VOLATILE_METADATA_KEYS = {
     "thread_goal",
     "title",
     "title_user_edited",
+    "context_graph_source_session_key",
+    "context_graph_child_session_key",
+    "context_graph_fork_boundary",
 }
 _WORKSPACE_STATE_DIR = ".nanobot"
 _WORKSPACE_ID_FILE = "workspace-id"
@@ -1884,14 +1887,18 @@ class SessionManager:
         source_key: str,
         target_key: str,
         before_user_index: int,
+        *,
+        include_user_message: bool = False,
     ) -> Session | None:
-        """Create *target_key* from *source_key* before a global user-message index.
+        """Create *target_key* at a global user-message boundary.
 
         ``before_user_index`` is zero-based over user messages in the full session:
         ``0`` means "before the first user message", ``1`` means "before the
         second user message", and so on. A value equal to the total user-message
         count copies the full session prefix. WebUI assistant-reply forks pass
         the next user index so the selected completed assistant turn is included.
+        Set ``include_user_message`` to include the selected user message but not
+        its following assistant reply.
         """
         if before_user_index < 0:
             return None
@@ -1906,6 +1913,8 @@ class SessionManager:
             if message.get("role") == "user" and not is_hidden_history_message(message):
                 if user_index == before_user_index:
                     found_target = True
+                    if include_user_message:
+                        copied.append(public_history_message(message))
                     break
                 user_index += 1
             copied.append(public_history_message(message))
@@ -1917,6 +1926,25 @@ class SessionManager:
         metadata = deepcopy(source.metadata)
         for key in _FORK_VOLATILE_METADATA_KEYS:
             metadata.pop(key, None)
+
+        from nanobot.context_graph.sync import (
+            FORK_BOUNDARY_METADATA_KEY,
+            FORK_CHILD_SESSION_METADATA_KEY,
+            FORK_SOURCE_SESSION_METADATA_KEY,
+            GRAPH_ID_METADATA_KEY,
+            graph_id_for_session,
+        )
+
+        graph_id = source.metadata.get(GRAPH_ID_METADATA_KEY)
+        if not isinstance(graph_id, str) or not graph_id:
+            graph_id = graph_id_for_session(source.key)
+        source.metadata[GRAPH_ID_METADATA_KEY] = graph_id
+        self.save(source, fsync=True)
+
+        metadata[GRAPH_ID_METADATA_KEY] = graph_id
+        metadata[FORK_SOURCE_SESSION_METADATA_KEY] = source_key
+        metadata[FORK_CHILD_SESSION_METADATA_KEY] = target_key
+        metadata[FORK_BOUNDARY_METADATA_KEY] = len(copied)
 
         last_consolidated = min(source.last_archived, len(copied))
         if source.last_archived > len(copied):
