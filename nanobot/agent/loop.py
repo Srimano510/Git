@@ -23,6 +23,7 @@ from loguru import logger
 
 from nanobot.agent import context as agent_context
 from nanobot.agent import model_presets as preset_helpers
+from nanobot.context_graph import ContextResult, get_context_engine
 from nanobot.agent.autocompact import AutoCompact
 from nanobot.agent.automation_turns import publish_next_deferred_turn
 from nanobot.agent.context import ContextBuilder, PersistedPromptContextResolver, TranscriptInput
@@ -141,6 +142,7 @@ class TurnContext:
     session: Session | None = None
 
     history: list[dict[str, Any]] = field(default_factory=list)
+    context_result: ContextResult | None = None
     transcript_input: TranscriptInput | None = None
     provider_state: ProviderConversationState | None = field(default=None, repr=False)
     request_context: RequestContext | None = None
@@ -1907,7 +1909,12 @@ class AgentLoop:
             session = ctx.require_session()
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
-        ctx.history = session.get_history(extend_to_user=is_subagent)
+        strategy = (session.metadata.get("context_strategy") or "linear").strip().lower()
+        engine = get_context_engine(strategy)
+        logger.debug("Using {} (strategy={}) for session {}", engine.__class__.__name__, strategy, ctx.session_key)
+        context_result = engine.build_context(session, extend_to_user=is_subagent)
+        ctx.context_result = context_result
+        ctx.history = context_result.messages
         stored_state = session.provider_state
         subagent_followup_persisted = False
         if is_subagent:

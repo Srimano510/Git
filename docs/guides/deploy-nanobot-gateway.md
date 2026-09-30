@@ -8,8 +8,7 @@ and WebSocket delivery online.
 
 - a verified nanobot config
 - a gateway process
-- a service or container deployment path with Docker, systemd, or macOS
-  LaunchAgent
+- a service deployment path with systemd or macOS LaunchAgent
 
 ## When to use this
 
@@ -46,7 +45,6 @@ Open the configured WebUI URL in a browser, or run `nanobot webui` as a foregrou
 
 ## Production notes
 
-- Docker Compose is the most repeatable Linux container path.
 - systemd user services are useful for Linux user-level gateway deployments.
 - macOS LaunchAgent keeps the gateway alive after login.
 - Persist the active config directory's `sessions/` folder together with the workspace
@@ -59,17 +57,13 @@ Open the configured WebUI URL in a browser, or run `nanobot webui` as a foregrou
   WebUI/WebSocket defaults to `8765`, and `nanobot serve` defaults to `8900`.
 - Bind externally only when you have configured tokens or API keys.
 - Keep chat access control intentional before deploying.
-- Use Docker or Linux sandboxing when shell tools are enabled for unattended
-  work.
+- Use Linux sandboxing when shell tools are enabled for unattended work.
 
 ## Troubleshooting
 
 - Use the same `--config` and `--workspace` flags for status checks and service
   startup.
-- Check logs with `docker compose logs`, `journalctl`, LaunchAgent logs, or
-  `nanobot gateway --verbose`.
-- If Docker port publishing does not work, confirm the service is not bound only
-  to container loopback.
+- Check logs with `journalctl`, LaunchAgent logs, or `nanobot gateway --verbose`.
 
 ## Related nanobot docs
 

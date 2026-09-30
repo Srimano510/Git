@@ -47,6 +47,7 @@ def create_webui_chat_fork(
     *,
     source_chat_id: str,
     before_user_index: int,
+    include_user_message: bool = False,
     title: str | None = None,
 ) -> tuple[str, str] | None:
     """Return ``(chat_id, session_key)`` for a new fork, or ``None`` for bad input."""
@@ -54,18 +55,22 @@ def create_webui_chat_fork(
     source_key = webui_session_key(source_chat_id)
     target_key = webui_session_key(new_id)
     try:
+        fork_options = {"include_user_message": True} if include_user_message else {}
         forked = session_manager.fork_session_before_user_index(
             source_key,
             target_key,
             before_user_index,
+            **fork_options,
         )
         if forked is None:
             return None
 
+        transcript_options = {"include_user_message": True} if include_user_message else {}
         transcript_ok = fork_transcript_before_user_index(
             source_key,
             target_key,
             before_user_index,
+            **transcript_options,
         )
         if not transcript_ok:
             write_session_messages_as_transcript(target_key, forked.messages)
@@ -95,11 +100,15 @@ async def handle_webui_fork_chat(
     """
     source_chat_id = envelope.get("source_chat_id")
     raw_index = envelope.get("before_user_index")
+    include_user_message = envelope.get("include_user_message", False)
     if not is_valid_webui_chat_id(source_chat_id):
         await channel.send_webui_protocol_error(connection, "invalid source_chat_id")
         return
     if isinstance(raw_index, bool) or not isinstance(raw_index, int) or raw_index < 0:
         await channel.send_webui_protocol_error(connection, "invalid before_user_index")
+        return
+    if not isinstance(include_user_message, bool):
+        await channel.send_webui_protocol_error(connection, "invalid include_user_message")
         return
 
     session_manager = channel.gateway.session_manager
@@ -112,6 +121,7 @@ async def handle_webui_fork_chat(
             session_manager,
             source_chat_id=source_chat_id,
             before_user_index=raw_index,
+            include_user_message=include_user_message,
             title=envelope.get("title") if isinstance(envelope.get("title"), str) else None,
         )
         if forked is None:

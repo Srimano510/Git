@@ -151,14 +151,6 @@ TELEGRAM_TOKEN=your-token-here
 IMAP_PASSWORD=your-password-here
 ```
 
-**Docker** — pass an env file to the locally built image (one `KEY=VALUE` per line), or use `-e KEY=value`:
-
-```bash
-docker run --rm --env-file=./nanobot.env \
-  -v ~/.nanobot:/home/nanobot/.nanobot \
-  nanobot agent -m "Hello"
-```
-
 **direnv** — drop a `.envrc` in your working directory and run `direnv allow`:
 
 ```bash
@@ -182,7 +174,7 @@ ANTHROPIC_API_KEY="$(bw get password api/anthropic)" nanobot agent
 
 ## Runtime Environment Variables
 
-These variables are process-level switches. Set them in the same terminal, service unit, container, or supervisor that starts nanobot.
+These variables are process-level switches. Set them in the same terminal, service unit, or supervisor that starts nanobot.
 
 ### Runtime controls
 
@@ -206,8 +198,6 @@ These variables are process-level switches. Set them in the same terminal, servi
 | `NANOBOT_SKIP_WIZARD` | unset | Set to `1` to skip automatic WebUI or wizard setup after one-command install. |
 | `NANOBOT_SKIP_WEBUI_BUILD` | unset | Set to `1` to skip bundling the WebUI during package builds. |
 | `NANOBOT_FORCE_WEBUI_BUILD` | unset | Set to `1` to rebuild the bundled WebUI even when `nanobot/web/dist/index.html` already exists. |
-| `NANOBOT_EXTRAS` | unset | Docker build argument containing comma-separated Python extras such as `bedrock`. |
-| `NANOBOT_CHANNELS` | `whatsapp` | Docker build argument containing comma-separated channels whose manifest dependencies are preinstalled. |
 | `NANOBOT_API_URL` | `http://127.0.0.1:8765` | Gateway target for the Vite WebUI dev server proxy. |
 
 Internal variables such as `NANOBOT_RESTART_*` and `NANOBOT_PATH_*` are set by nanobot itself and are not a supported user configuration surface.
@@ -860,8 +850,6 @@ nanobot agent -c ~/.nanobot-telegram/config.json -m "Hello!"
 nanobot agent -c ~/.nanobot-telegram/config.json -w /tmp/nanobot-telegram-test -m "Hello!"
 ```
 
-> Docker users: use `docker run -it` for interactive OAuth login.
-
 </details>
 
 <details>
@@ -1284,57 +1272,7 @@ ollama run llama3.2
 <details>
 <summary><b>OpenVINO Model Server (local / OpenAI-compatible)</b></summary>
 
-Run LLMs locally on Intel GPUs using [OpenVINO Model Server](https://docs.openvino.ai/2026/model-server/ovms_docs_llm_quickstart.html). OVMS exposes an OpenAI-compatible API at `/v3`.
-
-> Requires Docker and an Intel GPU with driver access (`/dev/dri`).
-
-**1. Pull the model** (example):
-
-```bash
-mkdir -p ov/models && cd ov
-
-docker run -d \
-  --rm \
-  --user $(id -u):$(id -g) \
-  -v $(pwd)/models:/models \
-  openvino/model_server:latest-gpu \
-  --pull \
-  --model_name openai/gpt-oss-20b \
-  --model_repository_path /models \
-  --source_model OpenVINO/gpt-oss-20b-int4-ov \
-  --task text_generation \
-  --tool_parser gptoss \
-  --reasoning_parser gptoss \
-  --enable_prefix_caching true \
-  --target_device GPU
-```
-
-> This downloads the model weights. Wait for the container to finish before proceeding.
-
-**2. Start the server** (example):
-
-```bash
-docker run -d \
-  --rm \
-  --name ovms \
-  --user $(id -u):$(id -g) \
-  -p 8000:8000 \
-  -v $(pwd)/models:/models \
-  --device /dev/dri \
-  --group-add=$(stat -c "%g" /dev/dri/render* | head -n 1) \
-  openvino/model_server:latest-gpu \
-  --rest_port 8000 \
-  --model_name openai/gpt-oss-20b \
-  --model_repository_path /models \
-  --source_model OpenVINO/gpt-oss-20b-int4-ov \
-  --task text_generation \
-  --tool_parser gptoss \
-  --reasoning_parser gptoss \
-  --enable_prefix_caching true \
-  --target_device GPU
-```
-
-**3. Add to config** (partial — merge into `~/.nanobot/config.json`):
+Run LLMs locally on Intel GPUs using [OpenVINO Model Server](https://docs.openvino.ai/2026/model-server/ovms_docs_llm_quickstart.html). Once an OVMS server exposes its OpenAI-compatible API at `/v3`, add it to the nanobot config:
 
 ```json
 {
@@ -2095,7 +2033,7 @@ For API keys, tokens, and other secrets, see [Environment Variables for Secrets]
 |--------|---------|-------------|
 | `tools.restrictToWorkspace` | `false` | When `true`, enables nanobot's application-level workspace guards for workspace-aware tools. File tools resolve paths under the active workspace; selected internal roots can be added as read-only or explicitly write-enabled roots, and media uploads are read-only by default. Shell execution rejects workspace-external `working_dir` values and applies best-effort command path checks, but this is not an OS sandbox. |
 | `tools.maxSessionMessagesPerMinute` | `6` | Maximum messages one source session may send during any rolling 60-second window. Additional sends are rejected to stop runaway agent loops. |
-| `tools.exec.sandbox` | `""` | Sandbox backend for shell commands. Set to `"bwrap"` to wrap exec calls in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox — the process can only see the workspace (read-write) and media directory (read-only); config files and API keys are hidden. Automatically enables workspace restriction for file tools. **Linux only** — requires `bwrap` installed (`apt install bubblewrap`; pre-installed in the Docker image). Not available on macOS or Windows (bwrap depends on Linux kernel namespaces). |
+| `tools.exec.sandbox` | `""` | Sandbox backend for shell commands. Set to `"bwrap"` to wrap exec calls in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox — the process can only see the workspace (read-write) and media directory (read-only); config files and API keys are hidden. Automatically enables workspace restriction for file tools. **Linux only** — requires `bwrap` installed (`apt install bubblewrap`). Not available on macOS or Windows (bwrap depends on Linux kernel namespaces). |
 | `tools.exec.enable` | `true` | When `false`, the shell `exec` tool is not registered at all. Use this to completely disable shell command execution. |
 | `tools.exec.timeout` | `60` | Default hard timeout in seconds for shell commands. Config values may exceed the per-call tool cap; set `0` to disable the hard timeout for trusted long-running commands. |
 | `tools.exec.pathPrepend` | `""` | Extra directories to prepend to `PATH` when running shell commands. Use this when configured tools should win executable lookup precedence, such as a Python virtual environment's `bin` or `Scripts` directory. |
@@ -2105,9 +2043,6 @@ For API keys, tokens, and other secrets, see [Environment Variables for Secrets]
 | `tools.webuiAllowRemotePackageInstall` | `false` | When `false`, the WebUI can install missing optional packages only from a browser opened on the same machine as nanobot. Set to `true` only when a trusted remote admin is allowed to install Python packages into this nanobot environment. |
 | `tools.ssrfWhitelist` | `[]` | CIDR ranges exempted from the shared SSRF guard used by web fetches and HTTP/SSE MCP connections. Prefer exact host CIDRs such as `192.168.1.50/32`; broad ranges increase SSRF exposure. |
 | `channels.*.allowFrom` | omitted | Access control per channel. Omit to use pairing-only mode; set `["*"]` to allow everyone; or list specific user IDs. See [Pairing](#pairing) for details. |
-
-**Docker security**: The official Docker image runs as a non-root user (`nanobot`, UID 1000) with bubblewrap pre-installed. The default `docker-compose.yml` drops all Linux capabilities except the `CHOWN`, `SETGID`, and `SETUID` capabilities required by the root entrypoint to initialize bind-mount ownership and become UID 1000. It enables `no-new-privileges` so the final non-root process cannot regain those bootstrap capabilities, and keeps Docker's default AppArmor/seccomp profiles enabled. If you enable `"tools.exec.sandbox": "bwrap"` inside Docker, start Compose with `docker-compose.bwrap.yml` as an additional override so bubblewrap can create nested namespaces. The host must also allow unprivileged user namespaces; the override cannot bypass a host-level namespace restriction.
-
 
 ## Pairing
 

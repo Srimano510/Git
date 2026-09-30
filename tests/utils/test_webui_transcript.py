@@ -273,6 +273,27 @@ def test_fork_transcript_before_user_index_copies_only_prefix(tmp_path, monkeypa
     assert "round3 must not appear" not in "\n".join(str(line.get("text")) for line in lines)
 
 
+def test_fork_transcript_can_include_selected_user_without_reply(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("nanobot.config.paths.get_data_dir", lambda: tmp_path)
+    source = "websocket:source"
+    for ev in (
+        {"event": "user", "chat_id": "source", "text": "round1"},
+        {"event": "message", "chat_id": "source", "text": "answer1"},
+        {"event": "user", "chat_id": "source", "text": "branch here"},
+        {"event": "message", "chat_id": "source", "text": "later answer"},
+    ):
+        append_transcript_object(source, ev)
+
+    assert fork_transcript_before_user_index(
+        source,
+        "websocket:user-branch",
+        1,
+        include_user_message=True,
+    )
+    lines = read_transcript_lines("websocket:user-branch")
+    assert [line.get("text") for line in lines] == ["round1", "answer1", "branch here"]
+
+
 def test_fork_transcript_rejects_out_of_range_user_index(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("nanobot.config.paths.get_data_dir", lambda: tmp_path)
     source = "websocket:source"

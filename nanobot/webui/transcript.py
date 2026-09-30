@@ -889,6 +889,8 @@ def fork_transcript_before_user_index(
     source_key: str,
     target_key: str,
     before_user_index: int,
+    *,
+    include_user_message: bool = False,
 ) -> bool:
     """Copy transcript rows before a zero-based global user-message index.
 
@@ -911,6 +913,11 @@ def fork_transcript_before_user_index(
         if _is_user_transcript_row(row):
             if user_index == before_user_index:
                 found_target = True
+                if include_user_message:
+                    dup = json.loads(json.dumps(row, ensure_ascii=False))
+                    if target_chat_id is not None:
+                        dup["chat_id"] = target_chat_id
+                    copied.append(dup)
                 break
             user_index += 1
         dup = json.loads(json.dumps(row, ensure_ascii=False))

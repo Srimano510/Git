@@ -385,6 +385,8 @@ export interface ChatSummary {
   preview: string;
   /** Model preset persisted for this session; null means it still follows the global default. */
   modelPreset?: string | null;
+  /** Context retrieval strategy (e.g. 'linear' or 'graph'). */
+  contextStrategy?: "linear" | "graph" | string;
   /** Unix epoch seconds when this session currently has a turn in flight. */
   runStartedAt?: number | null;
   /** Durable recovery state that needs attention after an interrupted turn. */
@@ -1559,7 +1561,13 @@ export type Outbound =
       action: string;
       payload: Record<string, unknown>;
     }
-  | { type: "fork_chat"; source_chat_id: string; before_user_index: number; title?: string }
+  | {
+      type: "fork_chat";
+      source_chat_id: string;
+      before_user_index: number;
+      include_user_message?: boolean;
+      title?: string;
+    }
   | { type: "attach"; chat_id: string }
   | { type: "set_sidebar_state"; state: SidebarStatePayload }
   | { type: "discard_temporary_chat"; chat_id: string }

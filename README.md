@@ -234,23 +234,13 @@ If nanobot worked for you, a star on GitHub is the simplest way to support the p
 - Want web search, MCP, security settings, or more config options? See [Configuration](./docs/configuration.md)
 - Want to run locally? See [Ollama](./docs/providers.md#ollama), [vLLM or another local OpenAI-compatible server](./docs/providers.md#vllm-or-other-local-openai-compatible-server), and the full [provider reference](./docs/configuration.md#providers).
 - Want to run nanobot in chat apps like Telegram, Discord, WeChat or Feishu? See [Chat Apps](./docs/chat-apps.md)
-- Want Docker or Linux service deployment? See [Deployment](./docs/deployment.md)
-
-<a id="deploy-to-render"></a>
+- Want Linux service or macOS LaunchAgent deployment? See [Deployment](./docs/deployment.md)
 
 ## ☁️ Deploy
 
-**Render — one click**
-
-Deploy nanobot's gateway and bundled WebUI from the repository's ready-to-use Blueprint:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/HKUDS/nanobot)
-
-Render will ask for `ANTHROPIC_API_KEY` and a private `NANOBOT_WEB_TOKEN`, then provision persistent storage for sessions, memory, and WebUI history. Persistent disks require a paid Render service.
-
 **Self-host**
 
-Prefer your own infrastructure? Follow the [deployment guide](./docs/deployment.md) for Docker, Docker Compose, Linux services, and macOS LaunchAgent setup.
+Run nanobot locally, or follow the [deployment guide](./docs/deployment.md) to manage it with a Linux systemd user service or macOS LaunchAgent.
 
 ## 🌐 WebUI
 
@@ -294,7 +284,7 @@ Browse the [repo docs](./docs/README.md) for the latest features and GitHub deve
 - Schedule or trigger agent work: [Automations](./docs/automations.md)
 - Configure providers, web search, MCP, and runtime behavior: [Configuration](./docs/configuration.md)
 - Integrate nanobot with local tools and automations: [OpenAI-Compatible API](./docs/openai-api.md) · [Python SDK](./docs/python-sdk.md)
-- Run nanobot with Docker or as a Linux service: [Deployment](./docs/deployment.md)
+- Run nanobot as a Linux service or macOS LaunchAgent: [Deployment](./docs/deployment.md)
 
 ## Releases
 

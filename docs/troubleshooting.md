@@ -27,7 +27,7 @@ This separates failures into layers:
 | `nanobot agent -m "Hello!"` | Config loading, provider/model access, workspace writes, and agent loop |
 | `nanobot gateway` | Channel startup, cron system jobs, heartbeat, WebUI/WebSocket, and health endpoint |
 
-If `nanobot agent -m "Hello!"` fails, fix that before debugging WebUI, Telegram, Discord, Docker, systemd, or any chat app.
+If `nanobot agent -m "Hello!"` fails, fix that before debugging WebUI, Telegram, Discord, systemd, or any chat app.
 
 `nanobot status` does not call the model. If provider/model setup is incomplete, it points to
 WebUI **Settings → Models** or the CLI setup wizard, then prints the command to check again.
@@ -151,7 +151,6 @@ If you need a known-good snippet instead of diagnosis, use [`provider-cookbook.m
 | OAuth provider fails | Run the matching login command: `openai-codex`, `xai-grok`, or `github-copilot`, normally with `--set-main`. |
 | Codex OAuth needs a proxy | Set `providers.openaiCodex.proxy` before running the login command. The proxy applies to login, token refresh, and Codex API requests. |
 | Codex login runs on a remote/headless machine | In the WebUI, open ChatGPT in your local browser; when the localhost callback page cannot load, copy the full `http://localhost:1455/auth/callback?...` URL from the address bar and paste it into the WebUI dialog. From the CLI, open the printed URL locally and paste the same callback URL back into the terminal. |
-| Codex login runs in Docker | Start the container with `docker run -it` so the OAuth flow has an interactive terminal. |
 | Codex says a model is not supported with a ChatGPT account | Use provider `openai_codex` with a Codex model such as `openai-codex/gpt-5.6-sol`. Do not use the direct-API `openai/...` prefix with Codex OAuth. |
 | Config says `providers.openai_codex` conflicts with the built-in provider | Under `providers`, keep only the canonical `openaiCodex` settings key and remove a duplicate `openai_codex` key. A model preset's `provider` value remains `openai_codex`. |
 | xAI OAuth needs a proxy | Set `providers.xaiGrok.proxy` before login. It applies to OAuth discovery, token exchange/refresh, and Grok subscription requests. |
@@ -308,7 +307,6 @@ See [`chat-apps.md`](./chat-apps.md) for channel-specific setup.
 | Symptom | Check |
 |---|---|
 | File access denied | Check `tools.restrictToWorkspace` and whether the target path is inside the active workspace. |
-| Shell commands fail in Docker | Sandbox settings may need Linux capabilities; see [`deployment.md`](./deployment.md). |
 | Web fetch blocked | SSRF protection blocks unsafe targets; use `tools.ssrfWhitelist` only for trusted private networks. |
 | MCP tools missing | Check `tools.mcpServers`, server startup command, environment variables, and tool allow list. |
 | Generated artifacts are missing | Check the active workspace and channel media directory. |

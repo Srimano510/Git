@@ -131,7 +131,12 @@ export function useSessions(): {
     workspaceScope?: WorkspaceScopePayload | null,
     modelPreset?: string | null,
   ) => Promise<string>;
-  forkChat: (sourceChatId: string, beforeUserIndex: number, title?: string) => Promise<string>;
+  forkChat: (
+    sourceChatId: string,
+    beforeUserIndex: number,
+    title?: string,
+    includeUserMessage?: boolean,
+  ) => Promise<string>;
   deleteChat: (
     key: string,
     options?: { deleteAutomations?: boolean },
@@ -237,12 +242,14 @@ export function useSessions(): {
     sourceChatId: string,
     beforeUserIndex: number,
     title?: string,
+    includeUserMessage = false,
   ): Promise<string> => {
     const chatId = await client.forkChat(
       sourceChatId,
       beforeUserIndex,
       title,
       CHAT_CREATE_TIMEOUT_MS,
+      includeUserMessage,
     );
     const key = `websocket:${chatId}`;
     optimisticKeysRef.current.add(key);

@@ -48,7 +48,7 @@ process running for messages.
 
 ## Production notes
 
-- Use Docker, systemd, or a macOS LaunchAgent when the process should survive
+- Use systemd or a macOS LaunchAgent when the process should survive
   terminal exits.
 - Give every deployed instance a distinct config path, workspace path, and port
   set.

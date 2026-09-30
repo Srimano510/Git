@@ -71,6 +71,27 @@ afterEach(() => {
 });
 
 describe("NanobotClient", () => {
+  it("includes selected user-boundary semantics in fork requests", async () => {
+    const client = new NanobotClient({
+      url: "ws://test",
+      reconnect: false,
+      socketFactory: (url) => new FakeSocket(url) as unknown as WebSocket,
+    });
+    client.connect();
+    const socket = lastSocket();
+    socket.fakeOpen();
+
+    const pending = client.forkChat("source-chat", 2, undefined, 5_000, true);
+    expect(JSON.parse(socket.sent.at(-1) as string)).toMatchObject({
+      type: "fork_chat",
+      source_chat_id: "source-chat",
+      before_user_index: 2,
+      include_user_message: true,
+    });
+    socket.fakeMessage({ event: "attached", chat_id: "fork-chat", temporary: false });
+    await expect(pending).resolves.toBe("fork-chat");
+  });
+
   it("reconciles simultaneous client submissions to the gateway-owned turn", () => {
     const client = new NanobotClient({
       url: "ws://test",

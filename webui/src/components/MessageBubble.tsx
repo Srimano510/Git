@@ -179,6 +179,30 @@ function MessageCopyButton({ content }: { content: string }) {
   );
 }
 
+function MessageForkButton({ onForkFromHere }: { onForkFromHere: () => void }) {
+  const { t } = useTranslation();
+  const label = t("message.forkFromHere");
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onForkFromHere}
+          aria-label={label}
+          className={cn(
+            "touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+            "transition-colors hover:bg-muted/55 hover:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+        >
+          <ForkArrowIcon className="h-4 w-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function deliveryErrorCopy(
   kind: MessageDeliveryErrorKind | undefined,
   t: (key: string) => string,
@@ -367,6 +391,7 @@ export function MessageBubble({
     const hasText = userContent.trim().length > 0;
     const showDeliveryStatus =
       message.deliveryStatus === "sending" || message.deliveryStatus === "failed";
+    const showForkButton = !!onForkFromHere;
     const createdAtLabel = formatMessageEndTime(message.createdAt);
     const showCreatedAt = createdAtLabel.length > 0;
     const createdAtTitle = showCreatedAt ? fmtDateTime(message.createdAt) : "";
@@ -416,7 +441,7 @@ export function MessageBubble({
             {messageText}
           </p>
         ) : null}
-        {showDeliveryStatus || showCreatedAt || (hasText && showCopyAction) ? (
+        {showDeliveryStatus || showCreatedAt || (hasText && showCopyAction) || showForkButton ? (
           <TooltipProvider delayDuration={220} skipDelayDuration={80}>
             <div className="flex min-h-8 items-center justify-end gap-1.5 text-muted-foreground">
               {showCreatedAt ? (
@@ -433,6 +458,7 @@ export function MessageBubble({
                 errorKind={message.deliveryErrorKind}
               />
               {hasText && showCopyAction ? <MessageCopyButton content={message.content} /> : null}
+              {showForkButton ? <MessageForkButton onForkFromHere={onForkFromHere} /> : null}
             </div>
           </TooltipProvider>
         ) : null}
@@ -460,7 +486,6 @@ export function MessageBubble({
     message.role === "assistant" && !message.isStreaming && !isTurnStreaming && !empty;
   const showCopyButton = showCopyAction && showAssistantActions;
   const showForkButton = showAssistantActions && !!onForkFromHere;
-  const forkLabel = t("message.forkFromHere");
   const completedAt = message.completedAt;
   const completedAtLabel =
     message.role === "assistant" && !message.isStreaming
@@ -530,25 +555,7 @@ export function MessageBubble({
             {showCopyButton ? (
               <MessageCopyButton content={message.content} />
             ) : null}
-            {showForkButton ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={onForkFromHere}
-                    aria-label={forkLabel}
-                    className={cn(
-                      "touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                      "transition-colors hover:bg-muted/55 hover:text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    )}
-                  >
-                    <ForkArrowIcon className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="center">{forkLabel}</TooltipContent>
-              </Tooltip>
-            ) : null}
+            {showForkButton ? <MessageForkButton onForkFromHere={onForkFromHere!} /> : null}
             {showAssistantTimestamp ? (
               <MessageTimestamp
                 {...(showCompletedAt ? { "data-assistant-completed-at": true } : {})}

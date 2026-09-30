@@ -493,6 +493,7 @@ def _indexed_row_for_session(session: Session, path: Path, webui_dir: Path) -> d
         "title": _metadata_title(session.metadata),
         "preview": _preview_from_messages(session.messages),
         _MODEL_PRESET_FIELD: model_preset_from_metadata(session.metadata),
+        "context_strategy": session.metadata.get("context_strategy", "linear"),
         "recovery_state": recovery_state_from_metadata(session.metadata),
         **_indexed_workspace_scope_fields(session.metadata),
         _ROW_SOURCE_FIELD: _SESSION_SOURCE,
