@@ -19,6 +19,7 @@ import type { ContextStrategy } from "@/components/thread/ContextStrategyBadge";
 import { ThreadHeader } from "@/components/thread/ThreadHeader";
 import { StreamErrorNotice } from "@/components/thread/StreamErrorNotice";
 import { ThreadViewport, type ThreadViewportHandle } from "@/components/thread/ThreadViewport";
+import ContextObservatory from "@/components/thread/ContextObservatory";
 import { useNanobotStream, type SendAttachment, type SendOptions } from "@/hooks/useNanobotStream";
 import { useSessionHistory } from "@/hooks/useSessions";
 import {
@@ -1567,8 +1568,8 @@ export function ThreadShell({
     },
     [chatId, onForkChat],
   );
-
-  const composer = (
+const [obsOpen, setObsOpen] = useState(false);
+const composer = (
     <>
       {recoveryState ? (
         <RecoveryNotice
@@ -1684,9 +1685,19 @@ export function ThreadShell({
           ingressLimits={ingressLimits}
         />
       )}
+      <button
+  onClick={() => setObsOpen(true)}
+  className="fixed bottom-24 right-4 z-30 rounded-full border bg-white px-3 py-2 text-xs shadow"
+>
+  Context
+</button>
+<ContextObservatory
+  open={obsOpen}
+  onClose={() => setObsOpen(false)}
+  sessionKey="current"
+/>
     </>
   );
-
   const emptyState = loading ? (
     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
       {t("thread.loadingConversation")}

@@ -1099,6 +1099,12 @@ export async function updateTranscriptionSettings(
       language: update.language,
       max_duration_sec: update.maxDurationSec,
       max_upload_mb: update.maxUploadMb,
-    },
+    }
   );
+}
+export async function updateSessionMetadata(
+  transport: WebUIMutationTransport,
+  sessionMetadata: Record<string, any>
+) {
+  return mutation(transport, "session.metadata.update", { sessionMetadata });
 }

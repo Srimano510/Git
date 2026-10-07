@@ -193,8 +193,10 @@ function MessageForkButton({ onForkFromHere }: { onForkFromHere: () => void }) {
             "touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
             "transition-colors hover:bg-muted/55 hover:text-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "w-auto gap-1 px-2 text-xs",
           )}
         >
+          <span>🗂️ Branch</span>
           <ForkArrowIcon className="h-4 w-4" />
         </button>
       </TooltipTrigger>
