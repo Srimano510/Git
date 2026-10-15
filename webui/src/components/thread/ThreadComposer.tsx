@@ -2451,12 +2451,12 @@ export function ThreadComposer({
             )}
           >
             {!voiceRecorder.isRecording ? (
-              <ContextStrategyBadge
-                strategy={contextStrategy}
-                onStrategyChange={onContextStrategyChange}
-                disabled={interactionDisabled}
-                isHero={isHero}
-              />
+             <ContextStrategyBadge
+             sessionKey=""
+             transport={undefined as any}
+  currentStrategy={contextStrategy}
+  onStrategyChange={onContextStrategyChange}
+/>
             ) : null}
             {modelLabel && !voiceRecorder.isRecording ? (
               <ModelPresetBadge
