@@ -1,81 +1,13 @@
-"""Context Engine implementations for Linear and Graph context construction."""
-
-from __future__ import annotations
-
-import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
-
+from typing import Any
+import time
 from loguru import logger
-
-from nanobot.config.paths import get_data_dir
+from nanobot.session import Session
 from nanobot.context_graph.model import ConversationGraph
 from nanobot.context_graph.observability import ContextResult
-from nanobot.context_graph.store import ContextGraphStore
-from nanobot.context_graph.sync import (
-    FORK_BOUNDARY_METADATA_KEY,
-    FORK_CHILD_SESSION_METADATA_KEY,
-    FORK_SOURCE_SESSION_METADATA_KEY,
-    GRAPH_ID_METADATA_KEY,
-    graph_id_for_session,
-    synchronize_session,
-)
+from nanobot.context_graph.store import ContextGraphStore, _default_graph_store
+from nanobot.context_graph.sync import _sync_session_graph
 from nanobot.utils.helpers import estimate_message_tokens
-
-if TYPE_CHECKING:
-    from nanobot.session.manager import Session
-
-
-_SESSION_GRAPH_NAMESPACE = "sessions"
-
-
-def _default_graph_store() -> ContextGraphStore:
-    return ContextGraphStore(root=get_data_dir() / "context_graph")
-
-
-def _sync_session_graph(
-    session: Session,
-    store: ContextGraphStore,
-    graph: ConversationGraph | None = None,
-) -> tuple[ConversationGraph, list[str], float, int]:
-    sync_started = time.perf_counter()
-    graph_id = graph.graph_id if graph is not None else session.metadata.get(GRAPH_ID_METADATA_KEY)
-    if not isinstance(graph_id, str) or not graph_id:
-        graph_id = graph_id_for_session(session.key)
-    graph_obj = graph or store.load(_SESSION_GRAPH_NAMESPACE, graph_id)
-    if graph_obj is None:
-        graph_obj = ConversationGraph(graph_id=graph_id)
-    branch_count_before = graph_obj.branch_count()
-
-    source_session = session.metadata.get(FORK_SOURCE_SESSION_METADATA_KEY)
-    child_session = session.metadata.get(FORK_CHILD_SESSION_METADATA_KEY)
-    fork_boundary = session.metadata.get(FORK_BOUNDARY_METADATA_KEY)
-    if child_session != session.key:
-        source_session = None
-        fork_boundary = None
-
-    nodes = synchronize_session(
-        graph_obj,
-        session_key=session.key,
-        messages=session.messages,
-        source_session=source_session if isinstance(source_session, str) else None,
-        fork_boundary=fork_boundary if isinstance(fork_boundary, int) else None,
-    )
-    saved_path = store.save(graph_obj, _SESSION_GRAPH_NAMESPACE)
-    sync_ms = (time.perf_counter() - sync_started) * 1000
-    branches_added = graph_obj.branch_count() - branch_count_before
-    if saved_path is None:
-        logger.warning("Context graph persistence failed for graph {}", graph_obj.graph_id)
-    if branches_added:
-        logger.info(
-            "Added {} context-graph branch edge(s); total={}, sync_ms={:.2f}",
-            branches_added,
-            graph_obj.branch_count(),
-            sync_ms,
-        )
-    return graph_obj, [node.id for node in nodes], sync_ms, branches_added
-
-
 class ContextEngineBase(ABC):
     """Abstract base class for conversation context engines."""
 
@@ -129,14 +61,13 @@ class LinearContextEngine(ContextEngineBase):
         graph_sync_ms = 0.0
         branch_count = 0
 
-        # Optionally synchronize session messages into the graph store for persistence
         if kwargs.get("persist_graph", True):
             graph_store = store or _default_graph_store()
             try:
                 graph_obj, _, graph_sync_ms, _ = _sync_session_graph(session, graph_store, graph)
                 branch_count = graph_obj.branch_count()
             except Exception as exc:
-                logger.debug("Non-fatal graph sync failure in LinearContextEngine: {}", exc)
+                logger.warning("Non-fatal graph sync failure in LinearContextEngine: {}", exc)
 
         return ContextResult(
             strategy="linear",
@@ -156,9 +87,10 @@ class LinearContextEngine(ContextEngineBase):
 
 class GraphContextEngine(ContextEngineBase):
     """
-    Experimental Graph-based context engine.
-    In Phase 1, acts as an adapter around the baseline replay semantics while
-    maintaining and synchronizing the graph data model.
+    Experimental graph-based context engine.
+
+    Phase 1 preserves chronological session replay while synchronizing the
+    conversation graph for persistence and branching diagnostics.
     """
 
     def __init__(self, window_size: int = 0) -> None:
@@ -176,24 +108,22 @@ class GraphContextEngine(ContextEngineBase):
         store: ContextGraphStore | None = None,
         **kwargs: Any,
     ) -> ContextResult:
-        started = time.perf_counter()
-        logger.debug("Using GraphContextEngine (Phase 1 baseline delegation)")
-
+        effective_max = max_messages or self.window_size
         graph_store = store or _default_graph_store()
         graph_obj: ConversationGraph | None = None
         graph_sync_ms = 0.0
         branches_added = 0
-        try:
-            graph_obj, node_ids, graph_sync_ms, branches_added = _sync_session_graph(
-                session,
-                graph_store,
-                graph,
-            )
-        except Exception as exc:
-            logger.warning("Graph sync failed in GraphContextEngine: {}", exc)
-            node_ids = []
+        node_ids: list[str] = []
+        if kwargs.get("persist_graph", True):
+            try:
+                graph_obj, node_ids, graph_sync_ms, branches_added = _sync_session_graph(
+                    session,
+                    graph_store,
+                    graph,
+                )
+            except Exception as exc:
+                logger.warning("Graph sync failed in GraphContextEngine: {}", exc)
 
-        # Delegate to linear history retrieval for Phase 1 baseline
         result = self._fallback_engine.build_context(
             session,
             max_messages=max_messages,
@@ -202,18 +132,15 @@ class GraphContextEngine(ContextEngineBase):
             graph=graph,
             store=graph_store,
             persist_graph=False,
-            **kwargs,
+            **{key: value for key, value in kwargs.items() if key != "persist_graph"},
         )
-
-        elapsed_ms = (time.perf_counter() - started) * 1000
-
         return ContextResult(
             strategy="graph",
             messages=result.messages,
             node_ids=node_ids,
-            reasons={nid: "phase1_linear_baseline" for nid in node_ids},
+            reasons={node_id: "phase1_linear_baseline" for node_id in node_ids},
             token_count=result.token_count,
-            retrieval_ms=elapsed_ms,
+            retrieval_ms=result.retrieval_ms,
             diagnostics={
                 "phase": 1,
                 "mode": "graph_baseline_delegation",
@@ -222,12 +149,13 @@ class GraphContextEngine(ContextEngineBase):
                 "branch_count": graph_obj.branch_count() if graph_obj is not None else 0,
                 "branches_added": branches_added,
                 "graph_sync_ms": graph_sync_ms,
+                "window_size": effective_max,
             },
         )
 
 
 def get_context_engine(strategy: str = "linear", **kwargs: Any) -> ContextEngineBase:
-    """Factory helper to obtain a ContextEngine by strategy name."""
+    """Create the configured context engine, defaulting to chronological replay."""
     normalized = (strategy or "").strip().lower()
     if normalized in {"graph", "context_graph"}:
         return GraphContextEngine(**kwargs)

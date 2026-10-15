@@ -1720,6 +1720,7 @@ const composer = (
   const threadHeader = !hideHeader ? (
     <ThreadHeader
       title={title}
+      sessionKey={session?.key ?? ""}
       handle={temporary || (hideHeaderTitle && inlineHandle) ? null : session?.handle}
       onToggleSidebar={onToggleSidebar}
       theme={theme}

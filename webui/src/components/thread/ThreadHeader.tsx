@@ -1,7 +1,7 @@
 import { ContextStrategyBadge } from "@/components/thread/ContextStrategyBadge";
 import { Menu } from "lucide-react";
 import { type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
+
 
 import { Button } from "@/components/ui/button";
 import { SessionHandleLabel } from "@/components/SessionHandleLabel";
@@ -11,10 +11,22 @@ interface ThreadHeaderProps {
   title: string;
   handle?: SessionHandle | null;
   sessionKey: string;
-  transport: any;
+  transport?: any;
   sessionMetadata?: Record<string, any>;
   onToggleSidebar?: () => void;
   actions?: ReactNode;
+  theme?: "light" | "dark";
+  onToggleTheme?: () => void;
+  hideSidebarToggleForHostChrome?: boolean;
+  hideSidebarToggle?: boolean;
+  hideThemeButton?: boolean;
+  hideTitle?: boolean;
+  minimal?: boolean;
+  promptNavigatorAction?: ReactNode;
+  sessionInfoAction?: ReactNode;
+  temporaryChatEnabled?: boolean;
+  temporaryChatDisabled?: boolean;
+  onTemporaryChatEnabledChange?: (enabled: boolean) => void;
 }
 
 export function ThreadHeader({
@@ -26,7 +38,7 @@ export function ThreadHeader({
   onToggleSidebar,
   actions,
 }: ThreadHeaderProps) {
-  const { t } = useTranslation();
+  
 
   return (
     <header className="flex h-12 w-full items-center justify-between border-b px-4 py-2 bg-background">
@@ -43,7 +55,7 @@ export function ThreadHeader({
           </Button>
         )}
         <h1 className="truncate text-sm font-semibold">{title}</h1>
-        {handle && <SessionHandleLabel handle={handle} />}
+        {handle && <SessionHandleLabel id={handle.id}>{handle.name}</SessionHandleLabel>}
       </div>
 
       {/* Right side: Strategy Badge & Header Actions */}

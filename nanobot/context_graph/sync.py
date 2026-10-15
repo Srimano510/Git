@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import time
 from typing import Any
+
+from loguru import logger
 
 from .model import (
     ChatNode,
     ConversationGraph,
     EdgeType,
 )
+from .store import ContextGraphStore
 
 GRAPH_ID_METADATA_KEY = "context_graph_id"
 FORK_SOURCE_SESSION_METADATA_KEY = "context_graph_source_session_key"
@@ -17,6 +21,55 @@ FORK_BOUNDARY_METADATA_KEY = "context_graph_fork_boundary"
 
 def graph_id_for_session(session_key: str) -> str:
     return "graph_" + sha256(session_key.encode("utf-8")).hexdigest()
+
+
+def _sync_session_graph(
+    session: Any,
+    store: ContextGraphStore,
+    graph: ConversationGraph | None = None,
+) -> tuple[ConversationGraph, list[str], float, int]:
+    started = time.perf_counter()
+    graph_id = graph.graph_id if graph is not None else session.metadata.get(GRAPH_ID_METADATA_KEY)
+    if not isinstance(graph_id, str) or not graph_id:
+        graph_id = graph_id_for_session(session.key)
+    session.metadata[GRAPH_ID_METADATA_KEY] = graph_id
+
+    graph_obj = graph or store.load("sessions", graph_id)
+    if graph_obj is None:
+        graph_obj = ConversationGraph(graph_id=graph_id)
+    branch_count_before = graph_obj.branch_count()
+
+    source_session = session.metadata.get(FORK_SOURCE_SESSION_METADATA_KEY)
+    child_session = session.metadata.get(FORK_CHILD_SESSION_METADATA_KEY)
+    fork_boundary = session.metadata.get(FORK_BOUNDARY_METADATA_KEY)
+    if child_session != session.key:
+        source_session = None
+        fork_boundary = None
+    if not isinstance(source_session, str):
+        source_session = None
+    if not isinstance(fork_boundary, int) or isinstance(fork_boundary, bool):
+        fork_boundary = None
+
+    nodes = synchronize_session(
+        graph_obj,
+        session_key=session.key,
+        messages=session.messages,
+        source_session=source_session,
+        fork_boundary=fork_boundary,
+    )
+    saved_path = store.save(graph_obj, "sessions")
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    branches_added = graph_obj.branch_count() - branch_count_before
+    if saved_path is None:
+        logger.warning("Context graph persistence failed for graph {}", graph_obj.graph_id)
+    if branches_added:
+        logger.info(
+            "Added {} context-graph branch edge(s); total={}, sync_ms={:.2f}",
+            branches_added,
+            graph_obj.branch_count(),
+            elapsed_ms,
+        )
+    return graph_obj, [node.id for node in nodes], elapsed_ms, branches_added
 
 
 def message_to_node(

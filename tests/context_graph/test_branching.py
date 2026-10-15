@@ -1,3 +1,4 @@
+from pathlib import Path
 from nanobot.context_graph.model import (
     ChatNode,
     ConversationGraph,
@@ -233,7 +234,7 @@ def test_historical_fork_persists_branch_after_reloading_sessions_and_graph(tmp_
     assert child_reload is not None
 
     store = ContextGraphStore(root=tmp_path / "graphs")
-    LinearContextEngine().build_context(source_reload, store=store)
+    GraphContextEngine().build_context(source_reload, store=store)
     result = GraphContextEngine().build_context(child_reload, store=store)
 
     graph_id = child_reload.metadata[GRAPH_ID_METADATA_KEY]

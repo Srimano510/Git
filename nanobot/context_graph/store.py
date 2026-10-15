@@ -121,3 +121,9 @@ class ContextGraphStore:
         )
         self.save_graph(session_key, graph_obj)
         return graph_obj
+
+
+def _default_graph_store() -> ContextGraphStore:
+    from nanobot.config.paths import get_data_dir
+
+    return ContextGraphStore(root=get_data_dir() / "context_graph")
