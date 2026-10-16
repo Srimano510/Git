@@ -1,3 +1,5 @@
+> **DEPRECATED (2026-10-16T10:22:36Z):** replaced by `log.md` at the repository root. Do not update this file.
+
 # Agent Execution State
 
 ## Session Metadata
