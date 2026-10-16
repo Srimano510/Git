@@ -104,3 +104,6 @@ exp/
 .playwright-mcp/
 bridge/node_modules/
 webui/.verify-*
+
+# Archived logs and old CI/error output (agents skip by default, see AGENTS.md)
+archive/
