@@ -1,20 +1,5 @@
-from .model import (
-    ChatEdge,
-    ChatNode,
-    ConversationGraph,
-    EdgeType,
-)
-
-from .store import ContextGraphStore
-from .engines import get_context_engine
+from .engines import GraphContextEngine
+from .model import ChatEdge, ConversationGraph, EdgeType
 from .observability import ContextResult
 
-__all__ = [
-    "ChatNode",
-    "ChatEdge",
-    "ConversationGraph",
-    "EdgeType",
-    "ContextGraphStore",
-    "get_context_engine",
-    "ContextResult",
-]
+__all__ = ["ChatEdge", "ConversationGraph", "ContextResult", "EdgeType", "GraphContextEngine"]

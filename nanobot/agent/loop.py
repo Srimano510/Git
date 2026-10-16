@@ -23,7 +23,6 @@ from loguru import logger
 
 from nanobot.agent import context as agent_context
 from nanobot.agent import model_presets as preset_helpers
-from nanobot.context_graph import ContextResult, get_context_engine
 from nanobot.agent.autocompact import AutoCompact
 from nanobot.agent.automation_turns import publish_next_deferred_turn
 from nanobot.agent.context import ContextBuilder, PersistedPromptContextResolver, TranscriptInput
@@ -56,6 +55,7 @@ from nanobot.bus.queue import MessageBus
 from nanobot.bus.runtime_events import RuntimeEventBus
 from nanobot.command import CommandContext, CommandRouter, register_builtin_commands
 from nanobot.config.schema import AgentDefaults, ModelPresetConfig
+from nanobot.context_graph import ContextResult, GraphContextEngine
 from nanobot.llm_usage.context import source_from_request
 from nanobot.providers.base import LLMProvider, LLMUsage, ProviderConversationState
 from nanobot.providers.factory import ProviderSnapshot
@@ -1910,11 +1910,18 @@ class AgentLoop:
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
         strategy = (session.metadata.get("context_strategy") or "linear").strip().lower()
-        engine = get_context_engine(strategy)
-        logger.debug("Using {} (strategy={}) for session {}", engine.__class__.__name__, strategy, ctx.session_key)
-        context_result = engine.build_context(session, extend_to_user=is_subagent)
-        ctx.context_result = context_result
-        ctx.history = context_result.messages
+        if strategy in {"graph", "context_graph"}:
+            context_result = GraphContextEngine(
+                load_session=self.sessions.read_session_snapshot
+            ).build_context(
+                session,
+                max_tokens=self.context_window_tokens,
+                extend_to_user=is_subagent,
+            )
+            ctx.context_result = context_result
+            ctx.history = context_result.messages
+        else:
+            ctx.history = session.get_history(extend_to_user=is_subagent)
         stored_state = session.provider_state
         subagent_followup_persisted = False
         if is_subagent:

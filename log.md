@@ -11,8 +11,8 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Project**: nanobot, extended with a context graph (`nanobot/context_graph/`) and a WebUI context-strategy toggle.
 - **Phase 1** (baseline context engine, graph data model, UI toggle): COMPLETE.
 - **Phase 2** (graph representation and branching, per [MasterGuide-v3.md](MasterGuide-v3.md)): COMPLETE.
-- **Phase 3**: not recorded here. The old state-log did not cover it (git history has `6ad7c1b5`, GraphContextEngine and Phase 3 graph tests).
-- **Open tasks**: none recorded.
+- **Phase 3** (typed-edge DAG context resolution): COMPLETE, uncommitted. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
+- **Open tasks**: none. Owner to review and commit Phase 3.
 
 ## Tasks
 
@@ -25,6 +25,18 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 
 ### Phase 2: Graph Representation & Branching
 - [x] Graph branching implemented and verified (see Phase 2 review below)
+
+### Phase 3: Typed-edge DAG Context Resolution (plan: docs/PHASE3-PLAN.md, rev 2)
+- [x] Plan rev 2 approved by owner
+- [x] P3-0 Audit: callers were `agent/loop.py`, `session/manager.py` (fork), `command/builtin.py` (only strategy name); WebUI reads only `context_strategy`. No backend route exists for `/context-result`.
+- [x] P3-1 Slim `model.py` (address nodes, typed edges, incoming index)
+- [x] P3-2 `resolver.py` with tests (diamond, root, cycle, isolation, CONTEXT edge, ordering)
+- [x] P3-3 `derive.py`: DAG derived from sessions; walks past fork into grandparents
+- [x] P3-4 `GraphContextEngine` on `Session.get_history` (budget, legality, fallback)
+- [x] P3-5 Deleted store/sync/LinearContextEngine layer; loop calls `get_history` for linear
+- [x] P3-6 Integration test through `ContextBuilder.build_transcript()`
+- [x] P3-7 Checks: context_graph 12/12; ruff clean; basedpyright 0 errors on touched files; full pytest 6306 passed, 5 failed (all pre-existing, see docs/REVIEW-LATER.md). WebUI untouched, so bun not run.
+- [x] P3-8 Docs: `docs/REVIEW-LATER.md`; `webui/build-errors.txt` kept per owner
 
 ## Change log
 
@@ -40,6 +52,10 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-09-28T19:57:36Z | Phase 1, Step 5 | Startup verification and final commit | `b548ab2e3` | SUCCESS |
 | (undated in state-log) | Phase 2 | Completion review recorded: graph branching verified (details below) | n/a | SUCCESS |
 | 2026-10-16T10:22:36Z | Migration | Created `log.md`; ported `state-log.md` content; moved `state-log.md` and `state.md` to `archive/` (`git mv`); added deprecation notice atop `archive/state-log.md`; added `archive/` to `.gitignore` | uncommitted | SUCCESS |
+| 2026-10-16 | Phase 3 prep | Installed `uv` into project `.venv` via pip (owner-approved, not global); ran `uv sync --all-extras --dev`; baseline `pytest tests/context_graph` 16 passed | n/a | SUCCESS |
+| 2026-10-16 | Phase 3 prep | Added `docs/PHASE3-PLAN.md`; added Phase 3 tasks to `log.md`; `AGENTS.md` Git & Commits: plan in `docs/` then wait for approval, owner commits | uncommitted | SUCCESS |
+| 2026-10-16 | Phase 3 prep | Owner answers Q1-Q4 + cut depth; rewrote `docs/PHASE3-PLAN.md` (rev 2: DAG derived from sessions, delete store/sync layer); added project-goal line atop `AGENTS.md` | uncommitted | SUCCESS |
+| 2026-10-16 | Phase 3 | Added `resolver.py`, `derive.py`; rewrote `model.py`, `engines.py`, `__init__.py`; deleted `store.py`, `sync.py` and tests `test_store/test_linear_engine/test_model/test_branching`; added `test_resolver.py`, rewrote `test_graph_engine.py` (7 tests); `session/manager.py` fork no longer writes graph id or re-saves source; `agent/loop.py` uses `GraphContextEngine` for graph and `session.get_history` for linear; added `docs/REVIEW-LATER.md` | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`

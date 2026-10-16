@@ -1927,24 +1927,15 @@ class SessionManager:
         for key in _FORK_VOLATILE_METADATA_KEYS:
             metadata.pop(key, None)
 
-        from nanobot.context_graph.sync import (
-            FORK_BOUNDARY_METADATA_KEY,
-            FORK_CHILD_SESSION_METADATA_KEY,
-            FORK_SOURCE_SESSION_METADATA_KEY,
-            GRAPH_ID_METADATA_KEY,
-            graph_id_for_session,
+        from nanobot.context_graph.derive import (
+            FORK_BOUNDARY_KEY,
+            FORK_CHILD_KEY,
+            FORK_SOURCE_KEY,
         )
 
-        graph_id = source.metadata.get(GRAPH_ID_METADATA_KEY)
-        if not isinstance(graph_id, str) or not graph_id:
-            graph_id = graph_id_for_session(source.key)
-        source.metadata[GRAPH_ID_METADATA_KEY] = graph_id
-        self.save(source, fsync=True)
-
-        metadata[GRAPH_ID_METADATA_KEY] = graph_id
-        metadata[FORK_SOURCE_SESSION_METADATA_KEY] = source_key
-        metadata[FORK_CHILD_SESSION_METADATA_KEY] = target_key
-        metadata[FORK_BOUNDARY_METADATA_KEY] = len(copied)
+        metadata[FORK_SOURCE_KEY] = source_key
+        metadata[FORK_CHILD_KEY] = target_key
+        metadata[FORK_BOUNDARY_KEY] = len(copied)
 
         last_consolidated = min(source.last_archived, len(copied))
         if source.last_archived > len(copied):

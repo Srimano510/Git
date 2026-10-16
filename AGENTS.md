@@ -1,5 +1,7 @@
 # AGENTS.md
 
+**Goal of this student project:** demonstrate a different way of building context. All implementation shall use the minimum amount of code for the demonstration and reuse the existing structure for everything else. Typed-edge DAG context building is the only new thing to implement.
+
 Guidance for AI coding agents working in **nanobot**, a lightweight, open-source AI agent framework in Python with a React/TypeScript WebUI. It centers on a small agent loop that receives messages from chat channels, invokes an LLM provider, executes tools, and manages session memory.
 
 ## Context & Status Tracking (required)
@@ -128,7 +130,8 @@ Keep every dependency install local to the project: Python packages through `uv`
 
 ## Git & Commits
 
-- **Prompt to commit before and after each piece of work.** Before starting a substantial task, and again when it is finished, ask the user whether to commit the current state. Commit only with their explicit permission, for that commit only (one approval doesn't cover the next). Don't push unless they ask for that too. If they decline, record it in `log.md` and carry on.
+- **Plan first, then wait.** For any substantial task, write an implementation plan in `docs/` (for example `docs/PHASE3-PLAN.md`), list the open decisions, then stop and wait for the owner's approval before writing code. The owner makes the commits; the agent does not commit.
+- **Prompt to commit before and after each piece of work.** Before starting a substantial task, and again when it is finished, tell the user the state is ready to commit and let them commit it. Commit yourself only with their explicit permission, for that commit only (one approval doesn't cover the next). Don't push unless they ask for that too. If they decline, record it in `log.md` and carry on.
 - Follow the commit and PR conventions in `CONTRIBUTING.md`. If it has none, use `<type>: <summary>` (for example `feat:`, `fix:`, `docs:`, `chore:`).
 - Check the diff for stray build outputs (`nanobot/web/dist`, caches, `node_modules`, virtual environments) before staging.
 
