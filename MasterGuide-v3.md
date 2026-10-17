@@ -1099,6 +1099,10 @@ The diamond-merge unit test in the generic guide should remain, but add a reposi
 **[DO THIS]**: Integrate semantic retrieval, persistence, and summarization into `GraphContextEngine`. Build or mock a `VectorIndex` that embeds messages and supports `save()`, `load()`, and `reindex(graph)` for persistence across session reloads. In `build_context`, after graph traversal, query the index with the current message to get extra node IDs. Add those nodes to context. Also implement summary logic: if a branch is long, create a summary node and use it in context instead of all children. Apply ranking and trimming to stay within the token budget. Test with examples to ensure semantic hits, vector persistence/re-indexing, and summary nodes appear/work in context as expected.
 ```
 
+### Phase 4 owner decisions and deviations (2026-10-18)
+
+Full plan: [docs/PHASE4-PLAN.md](docs/PHASE4-PLAN.md). Because Phase 3 removed the stored graph, this phase deviates from the text above: embeddings are a local hashed bag-of-words behind an `Embedder` interface; the vector index is **derived each turn** (no `save`/`load`/`reindex`, no index file); candidates come from a switchable pool (`archived` = own ancestry dropped by compaction, `family` = also sibling branches), config default plus per-session override; hits and summaries enter the prompt as **one synthetic recalled-context message**; summaries live in `session.metadata["context_summaries"]` and are created manually first (LLM generation later); the mode is a third strategy `hybrid`; the minimap shows a small marker set for recalled nodes (the full version belongs to Phase 6).
+
 ### Repository-specific implementation notes for Phase 4
 
 Keep semantic retrieval and summaries **inside `nanobot/context_graph/`** and outside the existing long-term `MemoryStore`/Dream system. They solve different problems:
@@ -1338,6 +1342,10 @@ Not much new; we may augment `ContextResult`:
 ```plaintext
 **[DO THIS]**: Build the Context Observatory UI and logging. After each query, collect the context nodes and metrics from both Linear and Graph engines. Display them in a panel showing lists of nodes, reasons for inclusion, and token counts. Highlight differences (Linear-only vs Graph-only). Log performance metrics and token usage for comparison. Prepare one multi-branch test conversation and run it to demonstrate the outputs of both strategies side-by-side.
 ```
+
+### Phase 6 note from Phase 4 (2026-10-18)
+
+Phase 4 ships only a **small** minimap marker set (history / vector / summary) and stores the last turn's node reasons in `session.metadata["_last_context"]`. Phase 6 should replace this with the **full Observatory** (strategy comparison, per-node reasons, token breakdown) and add the missing `/api/sessions/{key}/context-result` route that `ContextObservatory.tsx` already calls.
 
 ### Repository-specific implementation notes for Phase 6
 
