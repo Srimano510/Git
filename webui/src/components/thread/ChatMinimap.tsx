@@ -5,6 +5,7 @@ import {
   Controls,
   Handle,
   MiniMap,
+  PanOnScrollMode,
   Position,
   ReactFlow,
   useReactFlow,
@@ -13,7 +14,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Map as MapIcon, Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchSessionGraph } from "@/lib/api";
@@ -147,6 +148,7 @@ export function ChatMinimap({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [wide, setWide] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,6 +219,14 @@ export function ChatMinimap({
         <span className="flex gap-1">
           <button
             type="button"
+            aria-label={showOverview ? "Hide overview map" : "Show overview map"}
+            aria-pressed={showOverview}
+            onClick={() => setShowOverview((v) => !v)}
+          >
+            <MapIcon size={14} />
+          </button>
+          <button
+            type="button"
             aria-label={wide ? "Shrink chat tree" : "Expand chat tree"}
             onClick={() => setWide((w) => !w)}
           >
@@ -236,6 +246,10 @@ export function ChatMinimap({
             edges={edges}
             nodeTypes={nodeTypes}
             colorMode={theme}
+            panOnScroll
+            panOnScrollMode={PanOnScrollMode.Free}
+            zoomOnScroll={false}
+            zoomActivationKeyCode={["Control", "Meta"]}
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
@@ -253,7 +267,15 @@ export function ChatMinimap({
             <FocusOnLoad focus={focus} chatKey={`${sessionKey}:${wide}`} />
             <Background />
             <Controls showInteractive={false} />
-            <MiniMap position="bottom-right" pannable zoomable nodeColor={(n) => roleColor((n.data as ChatNodeData).node?.role)} />
+            {showOverview ? (
+              <MiniMap
+                position="bottom-right"
+                style={{ width: 110, height: 80 }}
+                pannable
+                zoomable
+                nodeColor={(n) => roleColor((n.data as ChatNodeData).node?.role)}
+              />
+            ) : null}
           </ReactFlow>
         )}
       </div>

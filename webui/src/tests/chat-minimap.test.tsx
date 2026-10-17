@@ -70,4 +70,15 @@ describe("ChatMinimap", () => {
     fireEvent.click(screen.getByLabelText("Close chat tree"));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("hides the overview map by default and toggles it", async () => {
+    stubGraph(chain(3));
+    render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
+    await screen.findAllByTestId("minimap-node");
+    expect(document.querySelector(".react-flow__minimap")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Show overview map"));
+    expect(document.querySelector(".react-flow__minimap")).not.toBeNull();
+    fireEvent.click(screen.getByLabelText("Hide overview map"));
+    expect(document.querySelector(".react-flow__minimap")).toBeNull();
+  });
 });

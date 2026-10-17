@@ -1401,6 +1401,7 @@
     "skill": "Kỹ năng: {{name}}",
     "askAboutSelection": "Hỏi về nội dung này",
     "forkFromHere": "Tách nhánh",
+    "moreActions": "Thêm thao tác",
     "copyReply": "Sao chép",
     "copiedReply": "Đã sao chép",
     "turnLatencyTitle": "Thời gian phản hồi (end-to-end)",

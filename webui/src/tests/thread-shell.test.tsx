@@ -1629,9 +1629,13 @@ describe("ThreadShell", () => {
     );
 
     const targetText = await screen.findByText("answer 100");
-    fireEvent.click(within(targetText.closest(".w-full") as HTMLElement).getByRole("button", {
-      name: "Fork",
-    }));
+    fireEvent.pointerDown(
+      within(targetText.closest(".w-full") as HTMLElement).getByRole("button", {
+        name: "More actions",
+      }),
+      { button: 0, ctrlKey: false },
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Fork" }));
 
     await waitFor(() =>
       expect(onForkChat).toHaveBeenCalledWith("long-chat", 101),

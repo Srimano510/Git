@@ -1402,6 +1402,7 @@
     "skill": "Habilidad: {{name}}",
     "askAboutSelection": "Preguntar sobre esto",
     "forkFromHere": "Bifurcar",
+    "moreActions": "Más acciones",
     "copyReply": "Copiar",
     "copiedReply": "Copiado",
     "turnLatencyTitle": "Tiempo de respuesta (extremo a extremo)",

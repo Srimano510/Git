@@ -15,6 +15,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/** Fork now lives in each message's "More actions" menu. */
+function forkFromMenu(trigger: HTMLElement) {
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fork" }));
+}
+
 describe("ThreadMessages", () => {
   it("shows optimistic turn progress in the thread before the first agent output", () => {
     vi.useFakeTimers();
@@ -1387,7 +1393,7 @@ describe("ThreadMessages", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "Copy" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Fork" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
     expect(screen.getByText("starting…").closest("[data-testid='activity-model-message']")).toBeNull();
     expect(screen.getByText("final reply").closest("[data-testid='activity-model-message']")).toBeNull();
   });
@@ -1482,12 +1488,12 @@ describe("ThreadMessages", () => {
     );
 
     expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Copy"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Fork"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="More actions"]')).toHaveLength(1);
 
     rerender(<ThreadMessages {...props} isStreaming={false} activeTurnId={null} />);
 
     expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Copy"]')).toHaveLength(3);
-    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Fork"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="More actions"]')).toHaveLength(2);
   });
 
   it("keeps active turn actions hidden across guidance and failed user rows", () => {
@@ -1517,7 +1523,7 @@ describe("ThreadMessages", () => {
     );
 
     expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Copy"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Fork"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="More actions"]')).toHaveLength(1);
   });
 
   it("only hides the active assistant-only automation turn", () => {
@@ -1540,7 +1546,7 @@ describe("ThreadMessages", () => {
     );
 
     expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Copy"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Fork"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="More actions"]')).toHaveLength(0);
   });
 
   it("falls back to the latest user boundary for untagged active slices", () => {
@@ -1558,7 +1564,7 @@ describe("ThreadMessages", () => {
 
     expect(container.querySelector('[data-assistant-footer] [aria-label="Copy"]'))
       .not.toBeInTheDocument();
-    expect(container.querySelector('[data-assistant-footer] [aria-label="Fork"]'))
+    expect(container.querySelector('[data-assistant-footer] [aria-label="More actions"]'))
       .not.toBeInTheDocument();
   });
 
@@ -1579,7 +1585,7 @@ describe("ThreadMessages", () => {
 
     expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Copy"]'))
       .toHaveLength(1);
-    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="Fork"]'))
+    expect(container.querySelectorAll('[data-assistant-footer] [aria-label="More actions"]'))
       .toHaveLength(1);
   });
 
@@ -1618,7 +1624,7 @@ describe("ThreadMessages", () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Fork" }).at(-1)!);
+    forkFromMenu(screen.getAllByRole("button", { name: "More actions" }).at(-1)!);
     expect(onForkFromMessage).toHaveBeenCalledWith(2);
   });
 
@@ -1635,7 +1641,7 @@ describe("ThreadMessages", () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Fork" })[0]);
+    forkFromMenu(screen.getAllByRole("button", { name: "More actions" })[0]);
     expect(onForkFromMessage).toHaveBeenCalledWith(0, true);
   });
 

@@ -14,6 +14,7 @@ import {
   Clock3,
   Copy,
   ImageIcon,
+  MoreHorizontal,
   Quote,
   Wrench,
 } from "lucide-react";
@@ -32,6 +33,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import {
@@ -179,29 +186,36 @@ function MessageCopyButton({ content }: { content: string }) {
   );
 }
 
-function MessageForkButton({ onForkFromHere }: { onForkFromHere: () => void }) {
+function MessageMoreMenu({ onForkFromHere }: { onForkFromHere: () => void }) {
   const { t } = useTranslation();
-  const label = t("message.forkFromHere");
+  const label = t("message.moreActions");
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onForkFromHere}
-          aria-label={label}
-          className={cn(
-            "touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-            "transition-colors hover:bg-muted/55 hover:text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            "w-auto gap-1 px-2 text-xs",
-          )}
-        >
-          <span>🗂️ Branch</span>
-          <ForkArrowIcon className="h-4 w-4" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center">{label}</TooltipContent>
-    </Tooltip>
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={label}
+              className={cn(
+                "touch-target inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                "transition-colors hover:bg-muted/55 hover:text-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              )}
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="center">{label}</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onForkFromHere}>
+          <ForkArrowIcon className="mr-2 h-4 w-4" />
+          {t("message.forkFromHere")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -460,7 +474,7 @@ export function MessageBubble({
                 errorKind={message.deliveryErrorKind}
               />
               {hasText && showCopyAction ? <MessageCopyButton content={message.content} /> : null}
-              {showForkButton ? <MessageForkButton onForkFromHere={onForkFromHere} /> : null}
+              {showForkButton ? <MessageMoreMenu onForkFromHere={onForkFromHere} /> : null}
             </div>
           </TooltipProvider>
         ) : null}
@@ -557,7 +571,7 @@ export function MessageBubble({
             {showCopyButton ? (
               <MessageCopyButton content={message.content} />
             ) : null}
-            {showForkButton ? <MessageForkButton onForkFromHere={onForkFromHere!} /> : null}
+            {showForkButton ? <MessageMoreMenu onForkFromHere={onForkFromHere!} /> : null}
             {showAssistantTimestamp ? (
               <MessageTimestamp
                 {...(showCompletedAt ? { "data-assistant-completed-at": true } : {})}

@@ -1400,6 +1400,7 @@
     "openAttachment": "開啟 {{name}}",
     "skill": "技能：{{name}}",
     "forkFromHere": "建立分支",
+    "moreActions": "更多操作",
     "copyReply": "複製",
     "copiedReply": "已複製",
     "turnLatencyTitle": "本輪耗時（端到端）",
