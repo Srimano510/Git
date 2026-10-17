@@ -34,7 +34,12 @@ interface ChatNodeData extends Record<string, unknown> {
   count?: number;
   active: boolean;
   selected: boolean;
+  kind?: "history" | "vector" | "summary";
+  /** A folded run whose messages were part of the last turn's context. */
+  inContext?: boolean;
 }
+
+const KIND_COLOR = { vector: "#f59e0b", summary: "#14b8a6" } as const;
 
 const ROLE_COLOR: Record<string, string> = {
   user: "#3b82f6",
@@ -53,7 +58,8 @@ const handles = (
 /** Level of detail: dot when zoomed out, one line at mid zoom, full text when zoomed in. */
 const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNodeData>>) {
   const zoom = useStore((s) => s.transform[2]);
-  const { node, count, active, selected } = data;
+  const { node, count, active, selected, kind, inContext } = data;
+  const flagged = kind === "vector" || kind === "summary" ? kind : null;
   const ring = selected
     ? "ring-2 ring-amber-500"
     : active
@@ -67,7 +73,7 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
         className="flex items-center justify-center rounded-full border border-dashed bg-muted text-[11px] text-muted-foreground"
       >
         {handles}
-        +{count} messages
+        +{count} messages{inContext ? " · in context" : ""}
       </div>
     );
   }
@@ -75,7 +81,12 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
     return (
       <div
         data-testid="minimap-node"
-        style={{ ...MESSAGE_SIZE, background: roleColor(node.role), opacity: active ? 1 : 0.55 }}
+        style={{
+          ...MESSAGE_SIZE,
+          background: roleColor(node.role),
+          opacity: active ? 1 : 0.55,
+          ...(flagged ? { outline: `4px solid ${KIND_COLOR[flagged]}` } : {}),
+        }}
         className={cn("rounded-md", ring)}
       >
         {handles}
@@ -100,6 +111,19 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
         />
         {node.role}
         <span className="text-muted-foreground">#{node.index}</span>
+        {flagged ? (
+          <span
+            data-testid={`minimap-kind-${flagged}`}
+            className="ml-auto rounded px-1 text-[9px] font-semibold text-white"
+            style={{ background: KIND_COLOR[flagged] }}
+          >
+            {flagged}
+          </span>
+        ) : kind === "history" ? (
+          <span data-testid="minimap-kind-history" className="ml-auto text-[9px] text-muted-foreground">
+            in context
+          </span>
+        ) : null}
       </div>
       <div className={zoom < 0.6 ? "truncate" : "line-clamp-2"}>{node.preview}</div>
     </div>
@@ -170,7 +194,11 @@ export function ChatMinimap({
     if (!payload) {
       return { nodes: [] as Node<ChatNodeData>[], edges: [] as Edge[], focus: [] as { id: string }[] };
     }
+    // Recalled nodes must stay visible, so they are never folded into a "+N messages" run.
     const keep = new Set(selectedNodeId ? [selectedNodeId] : []);
+    for (const [id, kind] of Object.entries(payload.context ?? {})) {
+      if (kind !== "history") keep.add(id);
+    }
     const folded = collapseRuns(payload, keep, expanded);
     const active = ancestorIds(payload.edges, payload.tips[sessionKey]);
     const flowNodes = layoutTree(folded.nodes, folded.edges).map<Node<ChatNodeData>>((n) => ({
@@ -184,6 +212,8 @@ export function ChatMinimap({
         count: n.count,
         active: n.members ? n.members.some((id) => active.has(id)) : active.has(n.id),
         selected: n.id === selectedNodeId,
+        kind: payload.context?.[n.id],
+        inContext: n.members?.some((m) => payload.context?.[m] === "history"),
       },
     }));
     const flowEdges = folded.edges.map<Edge>((e) => ({
@@ -237,6 +267,13 @@ export function ChatMinimap({
           </button>
         </span>
       </header>
+      {payload?.context ? (
+        <p data-testid="minimap-legend" className="border-b px-3 py-1 text-[11px] text-muted-foreground">
+          Last turn ({payload.context_strategy ?? "graph"}):{" "}
+          <span style={{ color: KIND_COLOR.vector }}>vector</span>{" · "}
+          <span style={{ color: KIND_COLOR.summary }}>summary</span>{" · in context"}
+        </p>
+      ) : null}
       <div className="relative min-h-0 flex-1">
         {error ? (
           <p role="alert" className="p-3 text-xs text-destructive">{error}</p>

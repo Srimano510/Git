@@ -81,4 +81,29 @@ describe("ChatMinimap", () => {
     fireEvent.click(screen.getByLabelText("Hide overview map"));
     expect(document.querySelector(".react-flow__minimap")).toBeNull();
   });
+
+  it("marks recalled nodes, shows a legend, and keeps them out of folded runs", async () => {
+    const payload = chain(9);
+    payload.context = { [id(4)]: "vector", [id(6)]: "history", [id(8)]: "history", [id(0)]: "summary" };
+    payload.context_strategy = "hybrid";
+    stubGraph(payload);
+    render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
+
+    expect(await screen.findByTestId("minimap-legend")).toHaveTextContent("hybrid");
+    // node 4 sits in the middle of a linear run but is recalled, so it stays visible
+    await waitFor(() => expect(document.querySelector(`[data-id="${id(4)}"]`)).not.toBeNull());
+    expect(screen.getByTestId("minimap-kind-vector")).toHaveTextContent("vector");
+    expect(screen.getByTestId("minimap-kind-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("minimap-kind-history")).toBeInTheDocument();
+    // the folded stretches around them are history that was in context
+    expect(screen.getAllByTestId("minimap-run").some((r) => r.textContent?.includes("in context"))).toBe(true);
+  });
+
+  it("shows no legend or markers for chats without a recorded context", async () => {
+    stubGraph(chain(3));
+    render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
+    await screen.findAllByTestId("minimap-node");
+    expect(screen.queryByTestId("minimap-legend")).toBeNull();
+    expect(screen.queryByTestId("minimap-kind-vector")).toBeNull();
+  });
 });

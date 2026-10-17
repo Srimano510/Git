@@ -426,42 +426,67 @@ async def cmd_model(ctx: CommandContext) -> OutboundMessage:
 
 
 async def cmd_context(ctx: CommandContext) -> OutboundMessage:
-    """Show or switch context strategy."""
+    """Show or switch context strategy; manage hybrid-mode pool and summaries."""
+    from nanobot.context_graph.summaries import add_summary, clear_summaries, list_summaries
+
     loop = ctx.loop
-    args = ctx.args.strip().lower()
+    raw_args = ctx.args.strip()  # keep case: summary text is user-authored
+    head, _, rest = raw_args.partition(" ")
+    head, rest = head.lower(), rest.strip()
     metadata = {**dict(ctx.msg.metadata or {}), "render_as": "text"}
     session = ctx.session or loop.sessions.get_or_create(ctx.key)
 
-    if not args:
-        current_strategy = session.metadata.get("context_strategy", "linear")
+    def reply(text: str) -> OutboundMessage:
         return OutboundMessage(
-            channel=ctx.msg.channel,
-            chat_id=ctx.msg.chat_id,
-            content=(
-                f"## Context Strategy\n"
-                f"- Current strategy: `{current_strategy}`\n"
-                f"- Available strategies: `linear`, `graph`\n"
-                f"- Switch with `/context <strategy>`"
-            ),
-            metadata=metadata,
+            channel=ctx.msg.channel, chat_id=ctx.msg.chat_id, content=text, metadata=metadata
         )
 
-    if args in {"linear", "graph", "context_graph"}:
-        strategy = "graph" if args in {"graph", "context_graph"} else "linear"
-        session.metadata["context_strategy"] = strategy
+    if not raw_args:
+        return reply(
+            "## Context Strategy\n"
+            f"- Current strategy: `{session.metadata.get('context_strategy', 'linear')}`\n"
+            f"- Hybrid pool: `{session.metadata.get('context_pool', 'config default')}`\n"
+            f"- Summaries: {len(list_summaries(session))}\n"
+            "- Available strategies: `linear`, `graph`, `hybrid`\n"
+            "- Switch with `/context <strategy>`; `/context hybrid archived|family|default`; "
+            "`/context summary <from> <to> <text>`"
+        )
+
+    if head == "summary":
+        if not rest:
+            found = list_summaries(session)
+            return reply(
+                "\n".join(f"- {d['from']}-{d['to']}: {d['text']}" for d in found)
+                or "No summaries. Use `/context summary <from> <to> <text>`."
+            )
+        if rest.lower() == "clear":
+            count = clear_summaries(session)
+            loop.sessions.save(session)
+            return reply(f"Cleared {count} summaries.")
+        try:
+            start, end, text = rest.split(None, 2)
+            add_summary(session, int(start), int(end), text)
+        except ValueError as exc:
+            return reply(f"Could not save summary: {exc}. Usage: `/context summary <from> <to> <text>`")
         loop.sessions.save(session)
-        return OutboundMessage(
-            channel=ctx.msg.channel,
-            chat_id=ctx.msg.chat_id,
-            content=f"Switched context strategy to `{strategy}` for this session.",
-            metadata=metadata,
-        )
+        return reply(f"Saved summary for messages {start}-{end}.")
 
-    return OutboundMessage(
-        channel=ctx.msg.channel,
-        chat_id=ctx.msg.chat_id,
-        content=f"Unknown context strategy: `{args}`. Available strategies: `linear`, `graph`.",
-        metadata=metadata,
+    if head in {"linear", "graph", "context_graph", "hybrid"}:
+        strategy = "graph" if head == "context_graph" else head
+        pool = rest.lower()
+        if strategy == "hybrid" and pool and pool not in {"archived", "family", "default"}:
+            return reply(f"Unknown pool: `{pool}`. Use `archived`, `family` or `default`.")
+        session.metadata["context_strategy"] = strategy
+        if strategy == "hybrid" and pool == "default":
+            session.metadata.pop("context_pool", None)
+        elif strategy == "hybrid" and pool:
+            session.metadata["context_pool"] = pool
+        loop.sessions.save(session)
+        suffix = f" (pool: `{pool}`)" if strategy == "hybrid" and pool else ""
+        return reply(f"Switched context strategy to `{strategy}`{suffix} for this session.")
+
+    return reply(
+        f"Unknown context strategy: `{raw_args}`. Available strategies: `linear`, `graph`, `hybrid`."
     )
 
 

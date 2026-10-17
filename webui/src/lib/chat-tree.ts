@@ -21,6 +21,9 @@ export interface TreePayload {
   nodes: TreeNode[];
   edges: TreeEdge[];
   tips: Record<string, string>;
+  /** Last graph/hybrid turn: node id -> why it was used. Absent for linear chats. */
+  context?: Record<string, "history" | "vector" | "summary">;
+  context_strategy?: string | null;
 }
 
 export interface DisplayNode {

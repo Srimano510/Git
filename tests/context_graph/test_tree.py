@@ -139,3 +139,22 @@ def test_nodes_carry_fork_args_and_user_text(tmp_path):
     assert "text" not in nodes["websocket:source#1"]
     assert nodes["websocket:source#2"]["fork_before_user_index"] == 1
     assert nodes["websocket:source#3"]["fork_before_user_index"] == 2
+
+
+def test_context_field_reports_last_turn_node_kinds_only_when_present(tmp_path):
+    sessions = make_manager(tmp_path)
+    source = seed(sessions)
+    assert "context" not in tree(sessions, source.key)
+
+    source.metadata["_last_context"] = {
+        "strategy": "hybrid",
+        "nodes": {"websocket:source#3": "history", "websocket:source#0": "vector"},
+    }
+    sessions.save(source)
+    result = tree(sessions, source.key)
+    assert result["context"] == {"websocket:source#3": "history", "websocket:source#0": "vector"}
+    assert result["context_strategy"] == "hybrid"
+
+    source.metadata["_last_context"] = "garbage"
+    sessions.save(source)
+    assert "context" not in tree(sessions, source.key)

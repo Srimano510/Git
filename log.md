@@ -11,9 +11,10 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Project**: nanobot, extended with a context graph (`nanobot/context_graph/`) and a WebUI context-strategy toggle.
 - **Phase 1** (baseline context engine, graph data model, UI toggle): COMPLETE.
 - **Phase 2** (graph representation and branching, per [MasterGuide-v3.md](MasterGuide-v3.md)): COMPLETE.
-- **Phase 3** (typed-edge DAG context resolution): COMPLETE, uncommitted. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
-- **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): IMPLEMENTED on branch `phase3.5`, uncommitted. Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md).
-- **Open tasks**: owner to review and commit Phase 3.5; a Playwright browser pass was done on 2026-10-17 against a temp gateway (see change log).
+- **Phase 3** (typed-edge DAG context resolution): COMPLETE. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
+- **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): COMPLETE, browser-checked with Playwright. Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md).
+- **Phase 4** (hybrid retrieval and summaries): IMPLEMENTED on branch `phase4`, uncommitted, browser-checked end to end. Plan and as-built notes: [docs/PHASE4-PLAN.md](docs/PHASE4-PLAN.md).
+- **Open tasks**: owner to review and commit Phase 4. Temp test gateway and mock LLM stopped; 0 open test sockets.
 
 ## Tasks
 
@@ -52,6 +53,21 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - [x] P3.5-8 Checks: ruff clean; basedpyright 0 errors on touched files; full pytest 6457 passed, 5 failed (same pre-existing five); `bun run build` OK; vitest: new tests pass, only pre-existing failures remain (8 in app-layout/thread-shell, see REVIEW-LATER); `bun run lint` has 5 errors, all in earlier Phase 1 code (not touched here)
 - [x] P3.5-9 Docs
 
+### Phase 4: Hybrid retrieval (semantic recall) and summaries (plan: docs/PHASE4-PLAN.md, decisions recorded)
+- [x] Owner decisions D1-D8 recorded (D1 hashed bag-of-words embeddings; D2 derive per turn, no index file; D3 both pools `archived`/`family`; D4 one synthetic recalled-context message; D5 manual summaries first, LLM later; D6 strategy `hybrid`; D7 small minimap flags now, full version in Phase 6; D8 config default + per-session override)
+- [x] P4-0 Audit (read-only). Findings: (1) **Injection point**: `TranscriptInput.session_summary` -> `ContextBuilder.build_system_prompt` appends an "[Archived Context Summary]" section; Phase 4 adds an additive `recalled_context` field and a "[Recalled Context]" section through the same path (a labelled block, so it never splices raw messages; placed last in the system prompt to keep the cacheable prefix stable). (2) `ContextResult` gets an additive `recalled` text field; `loop._build_transcript_input` passes it on. (3) `/context` in `command/builtin.py` lowercases all args, so `summary` text must be parsed from the raw args. (4) Config: root `Config` in `config/schema.py` gets a `context_graph` section; `AgentLoop.__init__`/`from_config` need one new optional parameter. (5) `context_strategy` is read in `loop.py:1912`, `builtin.py`, `webui/session_list_index.py:496`, `webui/session_projection.py:54` (both just pass the string through) and WebUI `ThreadShell`/`types.ts`/`api.ts` (type `ContextStrategy` is `"linear"|"graph"`). (6) No embedding code exists in nanobot. (7) `GraphContextEngine` already excludes archived indices (below `last_archived`) from replay.
+- [x] P4-1 `embed.py` (HashEmbedder, cosine) + tests
+- [x] P4-2 `recall.py` (candidates, scoring, both pools) + tests
+- [x] P4-3 `ContextGraphConfig` section + tests
+- [x] P4-4 Summaries store + `/context summary` + tests
+- [x] P4-5 Engine `hybrid` path + tests
+- [x] P4-6 Loop integration, `/context hybrid [pool]`, `_last_context`, integration test
+- [x] P4-7 `/graph` route `context` field + route test
+- [x] P4-8 WebUI: third toggle item, minimap markers + legend, vitest
+- [x] P4-9 Playwright browser check (AGENTS.md *Browser check*)
+- [x] P4-10 Checks: full pytest 6502 passed, 2 failed (unrelated: `test_mcp_reconnect_crash`, `test_session_location`); the other 3 earlier 'pre-existing' failures were stale tests for the additive `context_strategy` attach field and are fixed; ruff clean; basedpyright 0 errors on touched files; vitest 1143 passed, 8 failed (same 8 as before Phase 4); `bun run build` and `bun run lint` clean
+- [x] P4-11 Docs
+
 ## Change log
 
 Newest record last. Each record: timestamp, step, what changed, commit, status.
@@ -76,6 +92,9 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-10-17 | Phase 3.5 browser check + fixes | Playwright (`playwright-core` in scratchpad, installed Chrome) against an isolated temp gateway. Found and fixed: (1) minimap drew no edges (custom nodes lacked React Flow `Handle`s); (2) overview map and floating buttons overlapped (MiniMap moved to bottom-right, Tree button hidden while panel open); (3) header context-strategy toggle was cosmetic: no transport/metadata passed, saved nothing, always showed `linear`. `ContextStrategyBadge` is now controlled, header and composer share `ThreadShell` state and persist via `/context <strategy>`; removed dead `updateSessionMetadata` (no backend `session.metadata.update` exists); removed 4 of the old `any` lint errors (lint now clean). Verified in browser: both toggles sync and persist; click non-tip node -> banner -> send forks into a new chat with prefix + message. Added test for toggle sync. `AGENTS.md`: added *Browser check* section | uncommitted | SUCCESS |
 | 2026-10-17 | Phase 3.5 map UI pass 2 | Seeded a larger test family (10-turn root, 3 branches, 1 nested branch) in the scratchpad temp workspace and inspected the map with Playwright at zoom levels, wide mode, 600px and dark mode. Fixed: overview map showed no node markers and first fit was wrong (nodes now get explicit width/height); default view now frames the end of the active path at readable zoom once per chat (`FocusOnLoad`), refits when width mode changes; folded runs carry `members` so only runs on the active path count as active; LOD thresholds 0.3/0.6; visible edge stroke; React Flow `colorMode` follows app theme; wide mode is 55% of the shell with min 360px (was crushing the chat); below `md` the panel overlays the chat; Tree and Context floating buttons use theme tokens (were unreadable in dark mode) | uncommitted | SUCCESS |
 | 2026-10-17 | Phase 3.5 owner feedback round | Map: overview map now small (110x80) and hidden by default with a header toggle; wheel pans vertically, Shift+wheel sideways, Ctrl/Cmd+wheel zooms (`panOnScroll`, `zoomOnScroll=false`). Main UI: the per-message "Branch" button moved into a "More actions" (three dots) menu in `MessageBubble.tsx` (item label stays "Fork"); new i18n key `message.moreActions` in all 10 locales; tests updated (`message-bubble`, `thread-messages`, `thread-shell`) plus overview-toggle test. Verified in Chrome with wheel events and the menu | uncommitted | SUCCESS |
+| 2026-10-18 | Phase 4 plan | Read-only audit of `engines.py`, `derive.py`, `resolver.py`, loop call site, memory/summary code, config schema. Added `docs/PHASE4-PLAN.md` (decisions D1-D8, guide deviations, design, tasks P4-0..P4-11, risks); Phase 4 tasks in `log.md`; REVIEW-LATER entries (embedding options considered, deferred items); MasterGuide Phase 4 deviations note and Phase 6 note (replace minimal flags with full Observatory). No code changed | uncommitted | SUCCESS |
+| 2026-10-18 | Phase 4 implementation | New: `context_graph/embed.py` (HashEmbedder), `recall.py`, `summaries.py`; `tree.py` refactored (`load_family`, `message_text`, `context` fields); `engines.py` hybrid path (`query`, `hybrid`, `pool`, recalled block, diagnostics); `observability.py` (`recalled`, `kinds()`); `config/schema.py` (`ContextGraphConfig`, `contextGraph`); `agent/context.py` (`recalled_context` + "[Recalled Context]" section); `agent/loop.py` (`context_graph_config`, `_graph_context`, `_last_context`); `session/manager.py` (`_last_context` volatile on fork); `command/builtin.py` (`/context hybrid [pool]`, `/context summary ...`); WebUI: Hybrid toggle item, minimap markers/legend/in-context runs, `TreePayload.context`; docs/configuration.md section. Bugs fixed: `ToolsConfig` import-order (lazy resolve in `ToolsConfig.__init__`), sessions list dropped `context_strategy` (index v9), `/context` had no tests. Tests: embed, recall, summaries, hybrid engine, loop, config, tools-config lazy, context command, session list index, tree, minimap, thread-shell | uncommitted | SUCCESS |
+| 2026-10-18 | Phase 4 checks | Full suites run. Fixed stale expectations for the attach payload's `context_strategy` in `tests/webui/test_session_projection.py` and `nanobot/channels/websocket/tests/test_websocket_channel.py`. Results in P4-10 above | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`
