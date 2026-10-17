@@ -26,6 +26,7 @@ Before doing anything, read `log.md` up to the latest Change log record to get t
    - `ruff check nanobot/`.
    - `basedpyright` (strict, matches CI) after any typing-relevant change.
    - `cd webui && bun run test` and `bun run build` after any WebUI change.
+   - For any WebUI change, also look at the real page with Playwright (see *Browser check*). Unit tests alone are not enough.
 6. **Review** the diff before committing, and fix what the review finds.
 7. **Document** as in *End of Run Behavior*: `log.md`, the matching `.agent/*.md` file, the README or config docs if user-visible behaviour changed, and the *Parts to keep in mind* row you touched.
 8. **Review Later:** record any decision the owner should revisit in `docs/REVIEW-LATER.md` (create it if missing).
@@ -127,6 +128,16 @@ Messages flow through an async `MessageBus` (`nanobot/bus/queue.py`) that decoup
 ## Dependencies (strict)
 
 Keep every dependency install local to the project: Python packages through `uv` (project environment, `uv sync`), JavaScript packages through `bun` inside `webui/` (no global installs), and tools run with `uv run` or `bunx`. Never install anything globally (system packages, `npm -g`, a global Python, Node or Bun on the machine, global PATH or registry changes) unless it is absolutely necessary, and then only after asking the user and getting explicit permission. Log any approved global install in `log.md`.
+
+## Browser check (WebUI changes)
+
+Use Playwright to open the built WebUI, take screenshots and read console errors. Keep it out of the pr oject:
+
+- Install `playwright-core` with `bun add` in a throwaway folder in the agent scratchpad, never in `webui/` or the repo. Launch the installed Chrome with `chromium.launch({ channel: "chrome" })`, so no browser download is needed.
+- Do not touch the owner's running gateway or read their secrets. Start a separate gateway with a temp config and temp workspace: websocket channel on a spare port with `tokenIssueSecret` set to a throwaway password, and `-p` for a spare gateway port. Log in with that password.
+- Seed any chats the check needs (for example forks) into the temp workspace with `SessionManager`, not the owner's data.
+- Rebuild first (`cd webui && bun run build`), and stop the temp gateway when done (see *End of run behavior*).
+- Report honestly if the browser cannot be reached.
 
 ## Git & Commits
 

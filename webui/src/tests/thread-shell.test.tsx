@@ -1638,6 +1638,227 @@ describe("ThreadShell", () => {
     );
   });
 
+  it("branches from a past tree node: fork first, then send in the forked chat", async () => {
+    const client = makeClient();
+    const onForkChat = vi.fn().mockResolvedValue("chat-fork");
+    const rows = [
+      { role: "user" as const, content: "q1" },
+      { role: "assistant" as const, content: "a1" },
+      { role: "user" as const, content: "q2" },
+      { role: "assistant" as const, content: "a2" },
+    ];
+    const node = (index: number, role: string, forkBefore: number) => ({
+      id: `websocket:tree-chat#${index}`,
+      session_key: "websocket:tree-chat",
+      index,
+      role,
+      preview: `m${index}`,
+      fork_before_user_index: forkBefore,
+    });
+    const graph = {
+      root: "websocket:tree-chat",
+      nodes: [node(0, "user", 0), node(1, "assistant", 1), node(2, "user", 1), node(3, "assistant", 2)],
+      edges: [0, 1, 2].map((i) => ({
+        source: `websocket:tree-chat#${i}`,
+        target: `websocket:tree-chat#${i + 1}`,
+        type: "REPLY",
+      })),
+      tips: { "websocket:tree-chat": "websocket:tree-chat#3" },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("websocket%3Atree-chat/graph")) return httpJson(graph);
+        if (url.includes("websocket%3Atree-chat/webui-thread")) {
+          return httpJson(transcriptFromSimpleMessages(rows));
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      }),
+    );
+
+    const ui = (chatId: string) => (
+      <ThreadShell
+        session={session(chatId)}
+        title="Tree chat"
+        onToggleSidebar={() => {}}
+        onForkChat={onForkChat}
+      />
+    );
+    const { rerender } = render(wrap(client, ui("tree-chat")));
+    await screen.findByText("a2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    const target = await waitFor(() => {
+      const el = document.querySelector('[data-id="websocket:tree-chat#1"]');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    fireEvent.click(target);
+    expect(await screen.findByText(/Branching from assistant #1/)).toBeInTheDocument();
+
+    const input = await screen.findByRole("textbox");
+    fireEvent.change(input, { target: { value: "take another path" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => expect(onForkChat).toHaveBeenCalledWith("tree-chat", 1));
+    expect(client.sendMessage).not.toHaveBeenCalled();
+
+    rerender(wrap(client, ui("chat-fork")));
+    await waitFor(() =>
+      expect(client.sendMessage).toHaveBeenCalledWith(
+        "chat-fork",
+        "take another path",
+        undefined,
+        expect.objectContaining({ turnId: expect.any(String) }),
+      ),
+    );
+  });
+
+  it("pre-fills the composer when re-asking from a user node", async () => {
+    const client = makeClient();
+    const key = "websocket:ask-chat";
+    const n = (index: number, role: string, extra = {}) => ({
+      id: `${key}#${index}`,
+      session_key: key,
+      index,
+      role,
+      preview: `m${index}`,
+      fork_before_user_index: Math.ceil(index / 2),
+      ...extra,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("websocket%3Aask-chat/graph")) {
+          return httpJson({
+            root: key,
+            nodes: [n(0, "user", { text: "original question" }), n(1, "assistant"), n(2, "user", { text: "second" }), n(3, "assistant")],
+            edges: [0, 1, 2].map((i) => ({ source: `${key}#${i}`, target: `${key}#${i + 1}`, type: "REPLY" })),
+            tips: { [key]: `${key}#3` },
+          });
+        }
+        if (url.includes("websocket%3Aask-chat/webui-thread")) {
+          return httpJson(transcriptFromSimpleMessages([
+            { role: "user" as const, content: "original question" },
+            { role: "assistant" as const, content: "ans1" },
+            { role: "user" as const, content: "second" },
+            { role: "assistant" as const, content: "ans2" },
+          ]));
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      }),
+    );
+    render(
+      wrap(
+        client,
+        <ThreadShell
+          session={session("ask-chat")}
+          title="Ask chat"
+          onToggleSidebar={() => {}}
+          onForkChat={vi.fn().mockResolvedValue("x")}
+        />,
+      ),
+    );
+    await screen.findByText("ans2");
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    const el = await waitFor(() => {
+      const found = document.querySelector(`[data-id="${key}#0"]`);
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    fireEvent.click(el);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toHaveValue("original question"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(/Branching from/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the header and composer context-strategy toggles in sync and persists via /context", async () => {
+    const client = makeClient();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
+    );
+    render(
+      wrap(
+        client,
+        <ThreadShell session={session("strat-chat")} title="Strat" onToggleSidebar={() => {}} />,
+      ),
+    );
+    const badges = () =>
+      screen.getAllByText(/^(linear|graph)$/i).map((el) => el.closest("button") as HTMLElement);
+    await waitFor(() => expect(badges()).toHaveLength(2));
+    expect(badges().map((b) => b.textContent)).toEqual(["linear", "linear"]);
+
+    // header toggle drives the same state and the real backend command
+    fireEvent.pointerDown(badges()[0], { button: 0, ctrlKey: false });
+    fireEvent.click(badges()[0]);
+    fireEvent.click(await screen.findByText("Graph (DAG Pruning)"));
+    await waitFor(() =>
+      expect(client.sendSystemCommand).toHaveBeenCalledWith("strat-chat", "/context graph"),
+    );
+    expect(badges().map((b) => b.textContent)).toEqual(["graph", "graph"]);
+  });
+
+  it("sends normally when the tree selection is the tip", async () => {
+    const client = makeClient();
+    const onForkChat = vi.fn().mockResolvedValue("chat-fork");
+    const tip = "websocket:tip-chat#1";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("websocket%3Atip-chat/graph")) {
+          return httpJson({
+            root: "websocket:tip-chat",
+            nodes: [
+              { id: "websocket:tip-chat#0", session_key: "websocket:tip-chat", index: 0, role: "user", preview: "q", fork_before_user_index: 0 },
+              { id: tip, session_key: "websocket:tip-chat", index: 1, role: "assistant", preview: "a", fork_before_user_index: 1 },
+            ],
+            edges: [{ source: "websocket:tip-chat#0", target: tip, type: "REPLY" }],
+            tips: { "websocket:tip-chat": tip },
+          });
+        }
+        if (url.includes("websocket%3Atip-chat/webui-thread")) {
+          return httpJson(transcriptFromSimpleMessages([
+            { role: "user" as const, content: "q" },
+            { role: "assistant" as const, content: "a" },
+          ]));
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      }),
+    );
+    render(
+      wrap(
+        client,
+        <ThreadShell
+          session={session("tip-chat")}
+          title="Tip chat"
+          onToggleSidebar={() => {}}
+          onForkChat={onForkChat}
+        />,
+      ),
+    );
+    await screen.findByText("a");
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    const el = await waitFor(() => {
+      const found = document.querySelector(`[data-id="${tip}"]`);
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    fireEvent.click(el);
+    expect(screen.queryByText(/Branching from/)).not.toBeInTheDocument();
+
+    const input = await screen.findByRole("textbox");
+    fireEvent.change(input, { target: { value: "continue" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    await waitFor(() => expect(client.sendMessage).toHaveBeenCalled());
+    expect(onForkChat).not.toHaveBeenCalled();
+  });
+
   it("does not cache optimistic messages under the next chat during a session switch", async () => {
     const client = makeClient();
     const onNewChat = vi.fn().mockResolvedValue("chat-b");

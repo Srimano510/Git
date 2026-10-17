@@ -955,7 +955,7 @@ The diamond-merge unit test in the generic guide should remain, but add a reposi
 
 ## Phase 3.5: Chat-Tree Minimap & Node Navigation
 
-**Added 2026-10-17 (owner request). Full plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md). Status: approved 2026-10-17, implementation pending.**
+**Added 2026-10-17 (owner request). Full plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md). Status: implemented 2026-10-17 (uncommitted at time of writing).**
 
 - **Objective:** let the user see and navigate the whole conversation tree, and branch from any earlier node simply by sending a message from it.
 - **Minimap:** built on React Flow (`@xyflow/react`) with dagre layout; a pan/zoom canvas with zoom-dependent detail, collapsible runs of linear replies (branch points always visible), and a corner overview with a viewport rectangle that expands to the full canvas.

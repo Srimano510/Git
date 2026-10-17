@@ -20,6 +20,9 @@ import { ThreadHeader } from "@/components/thread/ThreadHeader";
 import { StreamErrorNotice } from "@/components/thread/StreamErrorNotice";
 import { ThreadViewport, type ThreadViewportHandle } from "@/components/thread/ThreadViewport";
 import ContextObservatory from "@/components/thread/ContextObservatory";
+import { ChatMinimap } from "@/components/thread/ChatMinimap";
+import { userPromptAnchors } from "@/components/thread/promptNavigation";
+import type { TreeNode } from "@/lib/chat-tree";
 import { useNanobotStream, type SendAttachment, type SendOptions } from "@/hooks/useNanobotStream";
 import { useSessionHistory } from "@/hooks/useSessions";
 import {
@@ -401,6 +404,8 @@ interface ThreadShellProps {
     beforeUserIndex: number,
     includeUserMessage?: boolean,
   ) => Promise<string | null>;
+  /** Switches the app to another chat (used by the chat-tree minimap). */
+  onOpenChat?: (chatId: string) => void;
   onTurnEnd?: () => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
@@ -700,6 +705,7 @@ export function ThreadShell({
   onToggleSidebar,
   onCreateChat,
   onForkChat,
+  onOpenChat,
   onTurnEnd,
   theme = "light",
   onToggleTheme = () => {},
@@ -1450,8 +1456,72 @@ export function ThreadShell({
     [booting, client, localModelPreset, onCreateChat, withWorkspaceScope, workspaceScope],
   );
 
+  // Chat-tree navigation: picking a past node arms "branch from here"; the next send
+  // forks at that node, then delivers the message in the new chat.
+  const [treeOpen, setTreeOpen] = useState(false);
+  const [branchFrom, setBranchFrom] = useState<TreeNode | null>(null);
+  const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<{ chatId: string; userIdx: number } | null>(
+    null,
+  );
+  const nodeChatId = (n: TreeNode) => n.session_key.slice(n.session_key.indexOf(":") + 1);
+
+  useEffect(() => {
+    setBranchFrom((b) => (b && nodeChatId(b) === chatId ? b : null));
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!scrollTarget || scrollTarget.chatId !== chatId || !messagesReady) return;
+    const anchor = userPromptAnchors(displayMessages)[scrollTarget.userIdx - userMessageOffset];
+    if (anchor) viewportRef.current?.jumpToUserPrompt(anchor.id);
+    setScrollTarget(null);
+  }, [chatId, displayMessages, messagesReady, scrollTarget, userMessageOffset]);
+
+  const handleSelectTreeNode = useCallback(
+    (node: TreeNode, isTip: boolean) => {
+      const ownerChatId = nodeChatId(node);
+      const userIdx = node.role === "user"
+        ? node.fork_before_user_index
+        : node.fork_before_user_index - 1;
+      setScrollTarget(userIdx >= 0 ? { chatId: ownerChatId, userIdx } : null);
+      setBranchFrom(isTip ? null : node);
+      setPrefill(
+        !isTip && node.role === "user" && node.text
+          ? { text: node.text, nonce: Date.now() }
+          : null,
+      );
+      if (ownerChatId !== chatId) onOpenChat?.(ownerChatId);
+    },
+    [chatId, onOpenChat],
+  );
+
+  const branchAndSend = useCallback(
+    async (
+      branch: TreeNode,
+      content: string,
+      images?: SendAttachment[],
+      options?: SendOptions,
+    ) => {
+      if (!onForkChat) return false;
+      const forkedChatId = await onForkChat(nodeChatId(branch), branch.fork_before_user_index);
+      if (!forkedChatId) return false;
+      messageCacheRef.current.delete(forkedChatId);
+      pendingCanonicalHydrateRef.current.delete(forkedChatId);
+      completedCanonicalHydrateVersionRef.current.delete(forkedChatId);
+      pendingFirstRef.current = { content, images, options: withWorkspaceScope(options) };
+      setBranchFrom(null);
+      setPrefill(null);
+      setPendingFirstTargetChatId(forkedChatId);
+      return true;
+    },
+    [onForkChat, withWorkspaceScope],
+  );
+
   const handleThreadSend = useCallback(
     (content: string, images?: SendAttachment[], options?: SendOptions) => {
+      if (branchFrom && nodeChatId(branchFrom) === chatId) {
+        return branchAndSend(branchFrom, content, images, options);
+      }
       setFallbackModelName(null);
       const submitted = send(content, images, withWorkspaceScope(options));
       if (
@@ -1464,7 +1534,7 @@ export function ThreadShell({
         setSubmittedViewportTurnId(submitted.turnId);
       }
     },
-    [chatId, send, withWorkspaceScope],
+    [branchAndSend, branchFrom, chatId, send, withWorkspaceScope],
   );
 
   const handleOpenFilePreview = useCallback((path: string) => {
@@ -1584,8 +1654,29 @@ const composer = (
           onDismiss={dismissStreamError}
         />
       ) : null}
+      {branchFrom && nodeChatId(branchFrom) === chatId ? (
+        <div
+          role="status"
+          className="mx-auto mb-1 flex w-full max-w-3xl items-center justify-between gap-2 rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-1 text-xs"
+        >
+          <span className="truncate">
+            Branching from {branchFrom.role} #{branchFrom.index}: {branchFrom.preview}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 underline"
+            onClick={() => {
+              setBranchFrom(null);
+              setPrefill(null);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
       {session ? (
         <ThreadComposer
+          prefill={prefill}
           onSend={handleThreadSend}
           disabled={!chatId}
           inputAriaLabel={composerInputAriaLabel}
@@ -1685,9 +1776,17 @@ const composer = (
           ingressLimits={ingressLimits}
         />
       )}
-      <button
+      {historyKey && !treeOpen ? (
+  <button
+    onClick={() => setTreeOpen(true)}
+    className="fixed bottom-36 right-4 z-30 rounded-full border bg-background px-3 py-2 text-xs text-foreground shadow"
+  >
+    Tree
+  </button>
+) : null}
+<button
   onClick={() => setObsOpen(true)}
-  className="fixed bottom-24 right-4 z-30 rounded-full border bg-white px-3 py-2 text-xs shadow"
+  className="fixed bottom-24 right-4 z-30 rounded-full border bg-background px-3 py-2 text-xs text-foreground shadow"
 >
   Context
 </button>
@@ -1721,6 +1820,8 @@ const composer = (
     <ThreadHeader
       title={title}
       sessionKey={session?.key ?? ""}
+      contextStrategy={activeContextStrategy}
+      onContextStrategyChange={session ? handleContextStrategyChange : undefined}
       handle={temporary || (hideHeaderTitle && inlineHandle) ? null : session?.handle}
       onToggleSidebar={onToggleSidebar}
       theme={theme}
@@ -1801,6 +1902,17 @@ const composer = (
           {composer}
         </div>,
         composerPortalTarget,
+      ) : null}
+      {treeOpen && historyKey ? (
+        <ChatMinimap
+          token={token}
+          sessionKey={historyKey}
+          refreshKey={displayMessages.length}
+          theme={theme}
+          selectedNodeId={branchFrom ? `${branchFrom.session_key}#${branchFrom.index}` : null}
+          onSelectNode={handleSelectTreeNode}
+          onClose={() => setTreeOpen(false)}
+        />
       ) : null}
       {filePreviewPath && historyKey ? (
         <FilePreviewPanel

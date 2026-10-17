@@ -1,5 +1,3 @@
-import { updateSessionMetadata } from "@/lib/api";
-import { useState } from "react";
 import { ListOrdered, Network } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -21,37 +19,16 @@ import { cn } from "@/lib/utils";
 export type ContextStrategy = "linear" | "graph";
 
 interface ContextStrategyBadgeProps {
-  sessionKey: string;
-  transport: any;
-  currentStrategy?: ContextStrategy;
+  strategy?: ContextStrategy;
   onStrategyChange?: (strategy: ContextStrategy) => void;
 }
 
 export function ContextStrategyBadge({
-  sessionKey,
-  transport,
-  currentStrategy = "linear",
+  strategy = "linear",
   onStrategyChange,
 }: ContextStrategyBadgeProps) {
-  const [strategy, setStrategy] = useState<ContextStrategy>(currentStrategy);
   const { t } = useTranslation();
-
-  const handleSelectStrategy = async (newStrategy: ContextStrategy) => {
-    setStrategy(newStrategy);
-    if (onStrategyChange) {
-      onStrategyChange(newStrategy);
-    }
-
-    try {
-      // Calls updateSessionMetadata from api.ts
-      await updateSessionMetadata(transport, {
-        session_key: sessionKey,
-        context_strategy: newStrategy,
-      });
-    } catch (error) {
-      console.error("Failed to update context strategy metadata:", error);
-    }
-  };
+  const handleSelectStrategy = (next: ContextStrategy) => onStrategyChange?.(next);
 
   return (
     <DropdownMenu>

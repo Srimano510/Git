@@ -1579,6 +1579,10 @@ function Shell({
     }
   }, [forkChat, navigate, sessions, sidebarState.title_overrides, t]);
 
+  const onOpenChat = useCallback((chatId: string) => {
+    navigate({ view: "chat", activeKey: `websocket:${chatId}`, settingsSection: "overview" });
+  }, [navigate]);
+
   const onNewChat = useCallback(() => {
     navigate(defaultShellRoute());
     setTemporaryChatEnabled(false);
@@ -2671,6 +2675,7 @@ function Shell({
                           temporaryChatEnabled ? onCreateTemporaryChat : onCreateChat
                         }
                         onForkChat={temporaryChatActive ? undefined : onForkChat}
+                        onOpenChat={onOpenChat}
                         onTurnEnd={onTurnEnd}
                         theme={theme}
                         onToggleTheme={toggle}
@@ -2707,6 +2712,7 @@ function Shell({
                       onNewChat={onNewChat}
                       onCreateChat={onCreateChat}
                       onForkChat={onForkChat}
+                      onOpenChat={onOpenChat}
                       onTurnEnd={context.active ? onTurnEnd : () => void refresh()}
                       theme={theme}
                       onToggleTheme={toggle}

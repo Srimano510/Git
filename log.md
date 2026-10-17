@@ -12,8 +12,8 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Phase 1** (baseline context engine, graph data model, UI toggle): COMPLETE.
 - **Phase 2** (graph representation and branching, per [MasterGuide-v3.md](MasterGuide-v3.md)): COMPLETE.
 - **Phase 3** (typed-edge DAG context resolution): COMPLETE, uncommitted. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
-- **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): PLAN APPROVED 2026-10-17 (decisions D1-D5 recorded in the plan; D1 = React Flow + dagre). Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md). Implementation starts after the owner commits the docs.
-- **Open tasks**: owner to commit Phase 3 and the Phase 3.5 docs; then start P3.5-0.
+- **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): IMPLEMENTED on branch `phase3.5`, uncommitted. Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md).
+- **Open tasks**: owner to review and commit Phase 3.5; a Playwright browser pass was done on 2026-10-17 against a temp gateway (see change log).
 
 ## Tasks
 
@@ -41,16 +41,16 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 
 ### Phase 3.5: Chat-tree minimap and node navigation (plan: docs/PHASE3_5-PLAN.md, approved)
 - [x] Owner decisions D1-D5 recorded (D1 React Flow + dagre; D2 one chat family; D3 explicit "branching from here" state; D4 user node = re-ask, assistant node keeps reply; D5 right-side collapsible panel)
-- [ ] P3.5-0 Fork-at-node contract tests (isolation, BRANCH edge, sibling exclusion) against existing fork code
-- [ ] P3.5-1 `node_to_fork_args` mapping + tests
-- [ ] P3.5-2 `build_tree_graph` (ancestors + descendants/siblings) + tests
-- [ ] P3.5-3 Read-only `GET /api/sessions/{key}/graph` + route test
-- [ ] P3.5-4 `bun add @xyflow/react @dagrejs/dagre` (local, approved); dagre tree layout + collapse of REPLY runs (unit-tested)
-- [ ] P3.5-5 `ChatMinimap` component on React Flow (pan/zoom, level-of-detail, built-in MiniMap overview)
-- [ ] P3.5-6 Click node -> open chat at that message
-- [ ] P3.5-7 Send from earlier node: fork then send (client orchestration)
-- [ ] P3.5-8 Checks (pytest, ruff, basedpyright, bun test/build)
-- [ ] P3.5-9 Docs
+- [x] P3.5-0 Fork-at-node contract tests (isolation, BRANCH edge, sibling exclusion) against existing fork code
+- [x] P3.5-1 `node_to_fork_args` mapping + tests
+- [x] P3.5-2 `build_tree_graph` (ancestors + descendants/siblings) + tests
+- [x] P3.5-3 Read-only `GET /api/sessions/{key}/graph` + route test
+- [x] P3.5-4 `bun add @xyflow/react @dagrejs/dagre` (local, approved); dagre tree layout + collapse of REPLY runs (unit-tested)
+- [x] P3.5-5 `ChatMinimap` component on React Flow (pan/zoom, level-of-detail, built-in MiniMap overview)
+- [x] P3.5-6 Click node -> open chat at that message
+- [x] P3.5-7 Send from earlier node: fork then send (client orchestration)
+- [x] P3.5-8 Checks: ruff clean; basedpyright 0 errors on touched files; full pytest 6457 passed, 5 failed (same pre-existing five); `bun run build` OK; vitest: new tests pass, only pre-existing failures remain (8 in app-layout/thread-shell, see REVIEW-LATER); `bun run lint` has 5 errors, all in earlier Phase 1 code (not touched here)
+- [x] P3.5-9 Docs
 
 ## Change log
 
@@ -72,6 +72,9 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-10-16 | Phase 3 | Added `resolver.py`, `derive.py`; rewrote `model.py`, `engines.py`, `__init__.py`; deleted `store.py`, `sync.py` and tests `test_store/test_linear_engine/test_model/test_branching`; added `test_resolver.py`, rewrote `test_graph_engine.py` (7 tests); `session/manager.py` fork no longer writes graph id or re-saves source; `agent/loop.py` uses `GraphContextEngine` for graph and `session.get_history` for linear; added `docs/REVIEW-LATER.md` | uncommitted | SUCCESS |
 | 2026-10-17 | Phase 3.5 plan | Read-only audit of fork logic (`session/manager.py`, `webui/forking.py`, `context_graph/derive.py`); added `docs/PHASE3_5-PLAN.md`; added Phase 3.5 tasks to `log.md`; split windows moved to `docs/REVIEW-LATER.md`; MasterGuide Phase 3.5 note. No code changed. Finding: send-from-earlier-node does not auto-branch today (fork is an explicit button) | uncommitted | SUCCESS |
 | 2026-10-17 | Phase 3.5 plan | Owner answered D1-D5; plan marked APPROVED; D1 changed to React Flow + dagre (least effort, size not a concern); `MasterGuide-v3.md` Phase 3.5 status updated. No code changed | uncommitted | SUCCESS |
+| 2026-10-17 | Phase 3.5 impl | Branch `phase3.5`. Backend: `context_graph/tree.py` (`node_to_fork_args`, `build_tree_graph`), `GET /api/sessions/{key}/graph` in `webui/ws_http.py`; tests `test_fork_at_node.py`, `test_tree.py`, route test in `test_websocket_channel.py`. WebUI: `bun add @xyflow/react @dagrejs/dagre` (local, owner-approved); `lib/chat-tree.ts`, `components/thread/ChatMinimap.tsx`, `fetchSessionGraph` in `lib/api.ts`, `ThreadShell.tsx` (Tree button, panel, branch banner, fork-then-send, scroll to turn), `ThreadComposer.tsx` (`prefill` prop), `App.tsx` (`onOpenChat`); tests `chat-tree.test.ts`, `chat-minimap.test.tsx`, 3 cases in `thread-shell.test.tsx`. Env note: vitest needs `NODE_OPTIONS=--localstorage-file=<tmp>` on Node 26 | uncommitted | SUCCESS |
+| 2026-10-17 | Phase 3.5 browser check + fixes | Playwright (`playwright-core` in scratchpad, installed Chrome) against an isolated temp gateway. Found and fixed: (1) minimap drew no edges (custom nodes lacked React Flow `Handle`s); (2) overview map and floating buttons overlapped (MiniMap moved to bottom-right, Tree button hidden while panel open); (3) header context-strategy toggle was cosmetic: no transport/metadata passed, saved nothing, always showed `linear`. `ContextStrategyBadge` is now controlled, header and composer share `ThreadShell` state and persist via `/context <strategy>`; removed dead `updateSessionMetadata` (no backend `session.metadata.update` exists); removed 4 of the old `any` lint errors (lint now clean). Verified in browser: both toggles sync and persist; click non-tip node -> banner -> send forks into a new chat with prefix + message. Added test for toggle sync. `AGENTS.md`: added *Browser check* section | uncommitted | SUCCESS |
+| 2026-10-17 | Phase 3.5 map UI pass 2 | Seeded a larger test family (10-turn root, 3 branches, 1 nested branch) in the scratchpad temp workspace and inspected the map with Playwright at zoom levels, wide mode, 600px and dark mode. Fixed: overview map showed no node markers and first fit was wrong (nodes now get explicit width/height); default view now frames the end of the active path at readable zoom once per chat (`FocusOnLoad`), refits when width mode changes; folded runs carry `members` so only runs on the active path count as active; LOD thresholds 0.3/0.6; visible edge stroke; React Flow `colorMode` follows app theme; wide mode is 55% of the shell with min 360px (was crushing the chat); below `md` the panel overlays the chat; Tree and Context floating buttons use theme tokens (were unreadable in dark mode) | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`

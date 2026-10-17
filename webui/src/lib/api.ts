@@ -1,3 +1,4 @@
+import type { TreePayload } from "@/lib/chat-tree";
 import type {
   ApiServicePayload,
   AutomationsPayload,
@@ -298,6 +299,19 @@ export async function fetchSessionAutomations(
 ): Promise<SessionAutomationsPayload> {
   return request<SessionAutomationsPayload>(
     `${base}/api/sessions/${encodeURIComponent(key)}/automations`,
+    token,
+    undefined,
+    API_READ_TIMEOUT_MS,
+  );
+}
+
+export async function fetchSessionGraph(
+  token: string,
+  key: string,
+  base: string = "",
+): Promise<TreePayload> {
+  return request<TreePayload>(
+    `${base}/api/sessions/${encodeURIComponent(key)}/graph`,
     token,
     undefined,
     API_READ_TIMEOUT_MS,
@@ -1101,10 +1115,4 @@ export async function updateTranscriptionSettings(
       max_upload_mb: update.maxUploadMb,
     }
   );
-}
-export async function updateSessionMetadata(
-  transport: WebUIMutationTransport,
-  sessionMetadata: Record<string, any>
-) {
-  return mutation(transport, "session.metadata.update", { sessionMetadata });
 }

@@ -1,6 +1,6 @@
 # Phase 3.5 plan: chat-tree minimap and node navigation
 
-Status: **APPROVED by owner 2026-10-17 (all five decisions in section 5 answered). No code written yet; implementation starts after the owner commits the docs.**
+Status: **IMPLEMENTED 2026-10-17 on branch `phase3.5`, uncommitted. All tasks P3.5-0 to P3.5-9 done; see log.md. Not yet tried by hand in a browser.**
 Position: after Phase 3 (typed-edge DAG resolution), before Phase 4. Phase 6 (Observatory) will reuse the minimap.
 Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse existing structure. This phase widens scope from the DAG to the WebUI, so it needs the owner's explicit agreement (section 1).
 
@@ -74,3 +74,10 @@ Backend work is limited to:
 - Compacted or trimmed prefixes: nodes below the compaction pointer may still exist in storage but not in the visible thread; the minimap shows them dimmed.
 - Graph and linear contexts look the same in simple chats (see REVIEW-LATER). The minimap makes that visible; it does not change it.
 - The `/context-result` route used by `ContextObservatory.tsx` still has no backend. Out of scope here (Phase 6).
+
+## 7. Implementation notes (as built)
+
+- Backend: `nanobot/context_graph/tree.py` holds `node_to_fork_args` and `build_tree_graph`. Each node carries `fork_before_user_index` (so the UI contains no index logic) and, for user nodes, the full `text` for re-ask prefill. Route: `GET /api/sessions/{key}/graph`.
+- The fork-at-node tests (P3.5-0) passed against the existing fork code without changes, so no Phase 2 bug was found. The mapping is simple: every node maps to the count of visible user messages before it, with no include-user flag, because "re-ask" and "keep the turn" both reduce to "stop before the next user message".
+- WebUI: `ChatMinimap` (React Flow, dagre, level of detail by zoom, built-in MiniMap, expand toggle). Selecting a node opens its chat, scrolls to the matching prompt, and arms the "Branching from ..." banner; the next send forks, then reuses the existing queued-first-message path to deliver the message in the new chat. Selecting a tip clears the branch.
+- Clicking a folded "+N messages" node expands it.

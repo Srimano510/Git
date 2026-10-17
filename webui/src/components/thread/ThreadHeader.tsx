@@ -1,4 +1,7 @@
-import { ContextStrategyBadge } from "@/components/thread/ContextStrategyBadge";
+import {
+  ContextStrategyBadge,
+  type ContextStrategy,
+} from "@/components/thread/ContextStrategyBadge";
 import { Menu } from "lucide-react";
 import { type ReactNode } from "react";
 
@@ -11,8 +14,8 @@ interface ThreadHeaderProps {
   title: string;
   handle?: SessionHandle | null;
   sessionKey: string;
-  transport?: any;
-  sessionMetadata?: Record<string, any>;
+  contextStrategy?: ContextStrategy;
+  onContextStrategyChange?: (strategy: ContextStrategy) => void;
   onToggleSidebar?: () => void;
   actions?: ReactNode;
   theme?: "light" | "dark";
@@ -32,9 +35,8 @@ interface ThreadHeaderProps {
 export function ThreadHeader({
   title,
   handle,
-  sessionKey,
-  transport,
-  sessionMetadata,
+  contextStrategy,
+  onContextStrategyChange,
   onToggleSidebar,
   actions,
 }: ThreadHeaderProps) {
@@ -60,12 +62,12 @@ export function ThreadHeader({
 
       {/* Right side: Strategy Badge & Header Actions */}
       <div className="flex items-center gap-2">
-        {/* PASTE BADGE HERE */}
-        <ContextStrategyBadge
-          sessionKey={sessionKey}
-          transport={transport}
-          currentStrategy={sessionMetadata?.context_strategy || "linear"}
-        />
+        {onContextStrategyChange ? (
+          <ContextStrategyBadge
+            strategy={contextStrategy}
+            onStrategyChange={onContextStrategyChange}
+          />
+        ) : null}
         {actions}
       </div>
     </header>
