@@ -27,7 +27,11 @@ function createTestStorage(): Storage {
   };
 }
 
-if (typeof window !== "undefined" && typeof localStorage.setItem !== "function") {
+// Node 26 exposes `localStorage` as undefined without --localstorage-file, so guard the access.
+if (
+  typeof window !== "undefined"
+  && (typeof localStorage === "undefined" || typeof localStorage.setItem !== "function")
+) {
   const storage = createTestStorage();
   Object.defineProperty(window, "localStorage", {
     value: storage,

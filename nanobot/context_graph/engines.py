@@ -153,7 +153,7 @@ class GraphContextEngine:
                     known = {**family.sessions, **sessions}
             cfg = self.config
             summaries = usable_summaries(known, ancestry, kept)
-            covered = {(u.key, i) for u in summaries for i in range(u.start, u.end + 1)}
+            covered = {n for u in summaries for n in u.nodes}
             candidates = pool_candidates(pool, ancestry, kept, known, family)
             info["semantic_candidates"] = len(candidates)
             hits = recall(
@@ -168,7 +168,7 @@ class GraphContextEngine:
             lines: list[tuple[str, str, str]] = []  # (node id, reason, rendered line)
             for u in summaries:
                 lines.append((
-                    f"{u.key}#{u.start}",
+                    f"{u.head[0]}#{u.head[1]}",
                     f"summary (covers {u.start}-{u.end})",
                     f"[summary of messages {u.start}-{u.end}] {u.text}",
                 ))

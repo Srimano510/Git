@@ -23,6 +23,28 @@ CONTEXT_EDGES_KEY = "context_edges"
 SessionLoader = Callable[[str], Session | None]
 
 
+def fork_of(s: Session) -> tuple[str, int] | None:
+    """``(source_key, boundary)`` if ``s`` is a fork with valid provenance metadata."""
+    meta: dict[str, Any] = s.metadata
+    source, boundary = meta.get(FORK_SOURCE_KEY), meta.get(FORK_BOUNDARY_KEY)
+    if (
+        meta.get(FORK_CHILD_KEY) == s.key
+        and isinstance(source, str)
+        and isinstance(boundary, int)
+        and not isinstance(boundary, bool)
+        and 0 < boundary <= len(s.messages)
+    ):
+        return source, boundary
+    return None
+
+
+def canonical_node(get: Callable[[str], Session], key: str, index: int) -> NodeId:
+    """The node that owns message ``index`` of ``key``: a fork's copied prefix aliases its source."""
+    while (f := fork_of(get(key))) and index < f[1]:
+        key = f[0]
+    return key, index
+
+
 def build_session_graph(
     session: Session, load_session: SessionLoader
 ) -> tuple[ConversationGraph, NodeId | None, dict[str, Session]]:
@@ -37,23 +59,8 @@ def build_session_graph(
             sessions[key] = loaded
         return sessions[key]
 
-    def fork(s: Session) -> tuple[str, int] | None:
-        meta: dict[str, Any] = s.metadata
-        source, boundary = meta.get(FORK_SOURCE_KEY), meta.get(FORK_BOUNDARY_KEY)
-        if (
-            meta.get(FORK_CHILD_KEY) == s.key
-            and isinstance(source, str)
-            and isinstance(boundary, int)
-            and not isinstance(boundary, bool)
-            and 0 < boundary <= len(s.messages)
-        ):
-            return source, boundary
-        return None
-
     def owner(key: str, index: int) -> NodeId:
-        while (f := fork(get(key))) and index < f[1]:
-            key = f[0]
-        return key, index
+        return canonical_node(get, key, index)
 
     graph = ConversationGraph()
     pending: list[str] = [session.key]
@@ -64,7 +71,7 @@ def build_session_graph(
             continue
         seen.add(key)
         s = get(key)
-        f = fork(s)
+        f = fork_of(s)
         for i in range((f[1] if f else 0) + 1, len(s.messages)):
             graph.add_edge((key, i - 1), (key, i), EdgeType.REPLY)
         if f:

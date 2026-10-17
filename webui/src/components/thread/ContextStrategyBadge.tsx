@@ -53,7 +53,7 @@ export function ContextStrategyBadge({
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>{t("Change Context Strategy")}</p>
+            <p>{t("thread.chatTree.strategyTooltip")}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -61,15 +61,15 @@ export function ContextStrategyBadge({
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => handleSelectStrategy("linear")}>
           <ListOrdered className="mr-2 h-4 w-4 text-blue-500" />
-          <span>Linear (Sequential)</span>
+          <span>{t("thread.chatTree.strategyLinear")}</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleSelectStrategy("graph")}>
           <Network className="mr-2 h-4 w-4 text-purple-500" />
-          <span>Graph (DAG Pruning)</span>
+          <span>{t("thread.chatTree.strategyGraph")}</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleSelectStrategy("hybrid")}>
           <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
-          <span>Hybrid (Graph + Vector)</span>
+          <span>{t("thread.chatTree.strategyHybrid")}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -50,3 +50,43 @@ def test_used_only_when_every_covered_ancestry_node_was_dropped():
     assert usable_summaries({"s": s}, ancestry, kept={("s", 3), ("s", 4), ("s", 5)}) == []
     # range outside ancestry (e.g. aliased fork prefix owned elsewhere) -> ignored
     assert usable_summaries({"s": s}, [("other", 0)], kept=set()) == []
+
+
+def fork_family(tmp_path):
+    from nanobot.session.manager import SessionManager
+
+    m = SessionManager(tmp_path / "ws", sessions_root=tmp_path / "files")
+    src = m.get_or_create("websocket:src")
+    for i in range(8):
+        src.add_message("user" if i % 2 == 0 else "assistant", f"s{i}")
+    add_summary(src, 0, 1, "source summary")
+    m.save(src)
+    kid = m.fork_session_before_user_index(src.key, "websocket:kid", 2)  # copies s0..s3
+    for i in range(4):
+        kid.add_message("user" if i % 2 == 0 else "assistant", f"k{i}")
+    m.save(kid)
+    return m, src, kid
+
+
+def test_summary_over_a_forks_copied_prefix_maps_to_the_source_nodes(tmp_path):
+    m, src, kid = fork_family(tmp_path)
+    add_summary(kid, 2, 3, "prefix summary written on the fork")
+    sessions = {"websocket:src": src, "websocket:kid": kid}
+    ancestry = [("websocket:src", i) for i in range(4)] + [("websocket:kid", i) for i in range(4, 8)]
+
+    out = usable_summaries(sessions, ancestry, kept={("websocket:kid", i) for i in range(4, 8)})
+
+    assert {u.text: u.head for u in out} == {
+        "source summary": ("websocket:src", 0),
+        "prefix summary written on the fork": ("websocket:src", 2),
+    }
+
+
+def test_inherited_copy_of_a_summary_is_not_counted_twice(tmp_path):
+    m, src, kid = fork_family(tmp_path)  # kid inherited src's "source summary" with the metadata copy
+    assert list_summaries(kid) == list_summaries(src)
+    sessions = {"websocket:src": src, "websocket:kid": kid}
+    ancestry = [("websocket:src", i) for i in range(4)] + [("websocket:kid", i) for i in range(4, 8)]
+
+    out = usable_summaries(sessions, ancestry, kept={("websocket:kid", i) for i in range(4, 8)})
+    assert [u.text for u in out] == ["source summary"]

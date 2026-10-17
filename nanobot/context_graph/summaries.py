@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from nanobot.session import Session
 
+from .derive import canonical_node
 from .model import NodeId
 
 SUMMARIES_KEY = "context_summaries"
@@ -15,10 +16,12 @@ SUMMARIES_KEY = "context_summaries"
 
 @dataclass(frozen=True)
 class Summary:
-    key: str
+    key: str  # session that stores the record
     start: int
     end: int
     text: str
+    head: NodeId  # first covered ancestry node (canonical: a fork's prefix maps to its source)
+    nodes: frozenset[NodeId]  # covered ancestry nodes (canonical)
 
 
 def list_summaries(session: Session) -> list[dict[str, Any]]:
@@ -59,12 +62,26 @@ def clear_summaries(session: Session) -> int:
 def usable_summaries(
     sessions: Mapping[str, Session], ancestry: Sequence[NodeId], kept: set[NodeId]
 ) -> list[Summary]:
-    """Summaries that stand in for ancestry nodes: every covered node was dropped from replay."""
+    """Summaries that stand in for ancestry nodes: every covered node was dropped from replay.
+
+    Ranges are resolved to canonical nodes, so a summary written on a fork over its copied
+    prefix matches the source's nodes, and a fork's inherited copy of a summary is not
+    counted twice.
+    """
     in_ancestry = set(ancestry)
+    seen: set[tuple[str, frozenset[NodeId]]] = set()
     out: list[Summary] = []
-    for key, s in sessions.items():
+    for key, s in sorted(sessions.items()):
         for d in list_summaries(s):
-            covered = {(key, i) for i in range(d["from"], d["to"] + 1)} & in_ancestry
-            if covered and not covered & kept:
-                out.append(Summary(key, d["from"], d["to"], d["text"]))
-    return sorted(out, key=lambda u: (u.key, u.start))
+            try:
+                nodes = frozenset(
+                    canonical_node(sessions.__getitem__, key, i)
+                    for i in range(d["from"], d["to"] + 1)
+                )
+            except KeyError:  # fork source not loaded: treat the range as this session's own
+                nodes = frozenset((key, i) for i in range(d["from"], d["to"] + 1))
+            covered = nodes & in_ancestry
+            if covered and not covered & kept and (d["text"], nodes) not in seen:
+                seen.add((d["text"], nodes))
+                out.append(Summary(key, d["from"], d["to"], d["text"], min(covered), covered))
+    return sorted(out, key=lambda u: u.head)

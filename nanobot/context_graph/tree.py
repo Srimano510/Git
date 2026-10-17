@@ -10,7 +10,7 @@ from nanobot.session import Session
 from nanobot.session.history_visibility import is_hidden_history_message
 
 from .derive import FORK_CHILD_KEY, FORK_SOURCE_KEY, build_session_graph
-from .model import ConversationGraph, NodeId
+from .model import ChatEdge, ConversationGraph, NodeId
 
 PREVIEW_CHARS = 80
 
@@ -116,6 +116,41 @@ def load_family(
     return Family(root, graph, nodes, tips, sessions)
 
 
+def _without_commands(
+    graph: ConversationGraph,
+    nodes: set[NodeId],
+    tips: dict[str, str],
+    sessions: Mapping[str, Session],
+) -> tuple[list[ChatEdge], set[NodeId], dict[str, str]]:
+    """Drop slash-command turns (``_command``) from the view, bridging the chain around them.
+
+    The nodes stay in the DAG (indices are addresses); they are just not shown.
+    """
+
+    def hidden(n: NodeId) -> bool:
+        owner = sessions.get(n[0])
+        return owner is not None and n[1] < len(owner.messages) and bool(
+            owner.messages[n[1]].get("_command")
+        )
+
+    skip = {n for n in nodes if hidden(n)}
+    edges = list(graph.edges)
+    for h in sorted(skip):
+        ins = [e for e in edges if e.target == h]
+        outs = [e for e in edges if e.source == h]
+        edges = [e for e in edges if e not in ins and e not in outs]
+        edges += [ChatEdge(i.source, o.target, o.type) for i in ins for o in outs]
+
+    def visible_tip(tip: str) -> str:
+        key, _, idx = tip.rpartition("#")
+        node = (key, int(idx))
+        while node in skip and (parents := graph.incoming(node)):
+            node = parents[0].source
+        return _node_id(node)
+
+    return edges, nodes - skip, {k: visible_tip(t) for k, t in tips.items()}
+
+
 def build_tree_graph(
     key: str,
     session_rows: Sequence[Mapping[str, Any]],
@@ -128,6 +163,7 @@ def build_tree_graph(
     root, graph, nodes, tips, sessions = (
         family.root, family.graph, family.nodes, family.tips, family.sessions,
     )
+    edges, nodes, tips = _without_commands(graph, nodes, tips, sessions)
     out_nodes: list[dict[str, Any]] = []
     for k, i in sorted(nodes):
         owner = sessions.get(k)
@@ -148,7 +184,7 @@ def build_tree_graph(
     out_edges = sorted(
         (
             {"source": _node_id(e.source), "target": _node_id(e.target), "type": e.type.value}
-            for e in graph.edges
+            for e in edges
         ),
         key=lambda e: (e["source"], e["target"], e["type"]),
     )
