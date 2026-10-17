@@ -34,14 +34,14 @@ def recall(
 ) -> list[Hit]:
     """Top ``top_k`` user/assistant text messages scoring at least ``min_score``.
 
-    Tool results, hidden history, empty text and ``exclude`` nodes never qualify.
+    Tool results, hidden history, slash-command turns, empty text and ``exclude`` nodes never qualify.
     """
     q = embedder.embed(query)
     if not q:
         return []
     hits: list[Hit] = []
     for node, m in candidates:
-        if node in exclude or m.get("role") not in ("user", "assistant"):
+        if node in exclude or m.get("role") not in ("user", "assistant") or m.get("_command"):
             continue
         if is_hidden_history_message(m) or not (text := message_text(m).strip()):
             continue

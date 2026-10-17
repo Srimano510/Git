@@ -158,3 +158,25 @@ def test_context_field_reports_last_turn_node_kinds_only_when_present(tmp_path):
     source.metadata["_last_context"] = "garbage"
     sessions.save(source)
     assert "context" not in tree(sessions, source.key)
+
+
+def test_slash_command_turns_are_left_out_and_the_chain_is_bridged(tmp_path):
+    sessions = make_manager(tmp_path)
+    s = sessions.get_or_create("websocket:cmd")
+    s.add_message("user", "first question")
+    s.add_message("assistant", "first answer")
+    s.add_message("user", "/context hybrid", _command=True)
+    s.add_message("assistant", "Switched context strategy to `hybrid`.", _command=True)
+    s.add_message("user", "second question")
+    s.add_message("assistant", "second answer")
+    sessions.save(s)
+
+    result = tree(sessions, s.key)
+    ids = [n["id"] for n in result["nodes"]]
+    assert ids == [f"websocket:cmd#{i}" for i in (0, 1, 4, 5)]
+    assert edge_set(result) == {
+        ("websocket:cmd#0", "websocket:cmd#1"),
+        ("websocket:cmd#1", "websocket:cmd#4"),
+        ("websocket:cmd#4", "websocket:cmd#5"),
+    }
+    assert result["tips"] == {"websocket:cmd": "websocket:cmd#5"}

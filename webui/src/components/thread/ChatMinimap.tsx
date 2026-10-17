@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import { Map as MapIcon, Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { fetchSessionGraph } from "@/lib/api";
 import {
@@ -57,6 +58,7 @@ const handles = (
 
 /** Level of detail: dot when zoomed out, one line at mid zoom, full text when zoomed in. */
 const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNodeData>>) {
+  const { t } = useTranslation();
   const zoom = useStore((s) => s.transform[2]);
   const { node, count, active, selected, kind, inContext } = data;
   const flagged = kind === "vector" || kind === "summary" ? kind : null;
@@ -73,7 +75,8 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
         className="flex items-center justify-center rounded-full border border-dashed bg-muted text-[11px] text-muted-foreground"
       >
         {handles}
-        +{count} messages{inContext ? " · in context" : ""}
+        {t("thread.chatTree.folded", { count })}
+        {inContext ? ` · ${t("thread.chatTree.inContext")}` : ""}
       </div>
     );
   }
@@ -117,11 +120,11 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
             className="ml-auto rounded px-1 text-[9px] font-semibold text-white"
             style={{ background: KIND_COLOR[flagged] }}
           >
-            {flagged}
+            {t(flagged === "vector" ? "thread.chatTree.kindVector" : "thread.chatTree.kindSummary")}
           </span>
         ) : kind === "history" ? (
           <span data-testid="minimap-kind-history" className="ml-auto text-[9px] text-muted-foreground">
-            in context
+            {t("thread.chatTree.inContext")}
           </span>
         ) : null}
       </div>
@@ -168,6 +171,7 @@ export function ChatMinimap({
   onSelectNode,
   onClose,
 }: ChatMinimapProps) {
+  const { t } = useTranslation();
   const [payload, setPayload] = useState<TreePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -238,18 +242,18 @@ export function ChatMinimap({
 
   return (
     <aside
-      aria-label="Chat tree"
+      aria-label={t("thread.chatTree.title")}
       className={cn(
         "flex shrink-0 flex-col border-l bg-background max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-20 max-md:shadow-xl",
         wide ? "w-[55%] min-w-[360px]" : "w-[360px] max-w-[90vw]",
       )}
     >
       <header className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
-        Chat tree
+        {t("thread.chatTree.title")}
         <span className="flex gap-1">
           <button
             type="button"
-            aria-label={showOverview ? "Hide overview map" : "Show overview map"}
+            aria-label={t(showOverview ? "thread.chatTree.hideOverview" : "thread.chatTree.showOverview")}
             aria-pressed={showOverview}
             onClick={() => setShowOverview((v) => !v)}
           >
@@ -257,21 +261,22 @@ export function ChatMinimap({
           </button>
           <button
             type="button"
-            aria-label={wide ? "Shrink chat tree" : "Expand chat tree"}
+            aria-label={t(wide ? "thread.chatTree.shrink" : "thread.chatTree.expand")}
             onClick={() => setWide((w) => !w)}
           >
             {wide ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button type="button" aria-label="Close chat tree" onClick={onClose}>
+          <button type="button" aria-label={t("thread.chatTree.close")} onClick={onClose}>
             <X size={14} />
           </button>
         </span>
       </header>
       {payload?.context ? (
         <p data-testid="minimap-legend" className="border-b px-3 py-1 text-[11px] text-muted-foreground">
-          Last turn ({payload.context_strategy ?? "graph"}):{" "}
-          <span style={{ color: KIND_COLOR.vector }}>vector</span>{" · "}
-          <span style={{ color: KIND_COLOR.summary }}>summary</span>{" · in context"}
+          {t("thread.chatTree.lastTurn", { strategy: payload.context_strategy ?? "graph" })}{" "}
+          <span style={{ color: KIND_COLOR.vector }}>{t("thread.chatTree.kindVector")}</span>{" · "}
+          <span style={{ color: KIND_COLOR.summary }}>{t("thread.chatTree.kindSummary")}</span>
+          {` · ${t("thread.chatTree.inContext")}`}
         </p>
       ) : null}
       <div className="relative min-h-0 flex-1">

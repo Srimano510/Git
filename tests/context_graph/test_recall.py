@@ -93,3 +93,12 @@ def test_family_pool_adds_sibling_branches_but_not_unrelated_chats(tmp_path):
     assert ("websocket:src", 3) in cands  # sibling continuation on the source branch
     assert (kid.key, 2) not in cands  # kept
     assert not any(k == "websocket:other" for k, _ in cands)
+
+
+def test_slash_command_turns_are_never_recalled():
+    cands = [
+        (("s", 0), msg("user", "/context hybrid database", _command=True)),
+        (("s", 1), msg("assistant", "Switched context strategy to hybrid database", _command=True)),
+        (("s", 2), msg("user", "which database strategy do we use")),
+    ]
+    assert [h.node for h in run("database strategy", cands, min_score=0.0)] == [("s", 2)]

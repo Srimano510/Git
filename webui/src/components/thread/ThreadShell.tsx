@@ -1660,7 +1660,11 @@ const composer = (
           className="mx-auto mb-1 flex w-full max-w-3xl items-center justify-between gap-2 rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-1 text-xs"
         >
           <span className="truncate">
-            Branching from {branchFrom.role} #{branchFrom.index}: {branchFrom.preview}
+            {t("thread.chatTree.branchingFrom", {
+              role: branchFrom.role,
+              index: branchFrom.index,
+              preview: branchFrom.preview,
+            })}
           </span>
           <button
             type="button"
@@ -1670,7 +1674,7 @@ const composer = (
               setPrefill(null);
             }}
           >
-            Cancel
+            {t("thread.chatTree.cancel")}
           </button>
         </div>
       ) : null}
@@ -1781,7 +1785,7 @@ const composer = (
     onClick={() => setTreeOpen(true)}
     className="fixed bottom-36 right-4 z-30 rounded-full border bg-background px-3 py-2 text-xs text-foreground shadow"
   >
-    Tree
+    {t("thread.chatTree.open")}
   </button>
 ) : null}
 <button
@@ -1819,7 +1823,6 @@ const composer = (
   const threadHeader = !hideHeader ? (
     <ThreadHeader
       title={title}
-      sessionKey={session?.key ?? ""}
       contextStrategy={activeContextStrategy}
       onContextStrategyChange={session ? handleContextStrategyChange : undefined}
       handle={temporary || (hideHeaderTitle && inlineHandle) ? null : session?.handle}
