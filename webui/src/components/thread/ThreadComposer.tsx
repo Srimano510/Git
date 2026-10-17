@@ -236,6 +236,8 @@ interface ThreadComposerProps {
   ingressLimits?: WebUIIngressLimits | null;
   quotedContext?: string | null;
   focusRequest?: number;
+  /** Replaces the draft with `text` each time `nonce` changes (re-ask from the chat tree). */
+  prefill?: { text: string; nonce: number } | null;
   onQuotedContextChange?: (text: string | null) => void;
 }
 
@@ -937,6 +939,7 @@ export function ThreadComposer({
   ingressLimits = null,
   quotedContext = null,
   focusRequest = 0,
+  prefill = null,
   onQuotedContextChange,
 }: ThreadComposerProps) {
   const { t } = useTranslation();
@@ -1071,6 +1074,14 @@ export function ThreadComposer({
     const id = requestAnimationFrame(() => el.focus());
     return () => cancelAnimationFrame(id);
   }, [hasTouchPrimaryPointer, interactionDisabled, showProjectPicker, workspaceError]);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setValue(prefill.text);
+    const id = requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce]);
 
   useEffect(() => {
     if (!focusRequest || interactionDisabled) return;
@@ -2451,12 +2462,10 @@ export function ThreadComposer({
             )}
           >
             {!voiceRecorder.isRecording ? (
-             <ContextStrategyBadge
-             sessionKey=""
-             transport={undefined as any}
-  currentStrategy={contextStrategy}
-  onStrategyChange={onContextStrategyChange}
-/>
+              <ContextStrategyBadge
+                strategy={contextStrategy}
+                onStrategyChange={onContextStrategyChange}
+              />
             ) : null}
             {modelLabel && !voiceRecorder.isRecording ? (
               <ModelPresetBadge

@@ -953,6 +953,19 @@ The diamond-merge unit test in the generic guide should remain, but add a reposi
 
 ---
 
+## Phase 3.5: Chat-Tree Minimap & Node Navigation
+
+**Added 2026-10-17 (owner request). Full plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md). Status: implemented 2026-10-17 (uncommitted at time of writing).**
+
+- **Objective:** let the user see and navigate the whole conversation tree, and branch from any earlier node simply by sending a message from it.
+- **Minimap:** built on React Flow (`@xyflow/react`) with dagre layout; a pan/zoom canvas with zoom-dependent detail, collapsible runs of linear replies (branch points always visible), and a corner overview with a viewport rectangle that expands to the full canvas.
+- **Navigation:** clicking a node opens that chat at that message. Sending a message from an earlier node forks first (reusing `fork_session_before_user_index` through the existing `fork_chat` command), then sends in the new chat. Sending from the tip does not fork.
+- **Backend:** a pure node-to-fork-index mapping, a tree builder that also covers siblings and descendants (Phase 3 derives ancestors only), and a read-only `GET /api/sessions/{key}/graph`. Contract tests are written first.
+- **Out of scope:** split windows (see `docs/REVIEW-LATER.md`).
+- **Reused later:** the Phase 6 Observatory highlights context nodes on this minimap.
+
+---
+
 ## Phase 4: Hybrid Retrieval & Summaries
 
 **Objective:** Enhance the graph-based context with semantic search and summarization. The context engine should now optionally retrieve additional relevant nodes via vector similarity, handle **SUMMARY** nodes to condense long histories, and maintain full persistence/re-indexing of vector embeddings across application restarts. This shows how a hybrid (graph + vector) approach works reliably in persistent sessions.
@@ -1417,7 +1430,8 @@ Add tests for:
 flowchart LR
     P1[Phase 1: Baseline & Toggle] --> P2[Phase 2: Graph & Branching]
     P2 --> P3[Phase 3: Graph Traversal Engine]
-    P3 --> P4[Phase 4: Hybrid Retrieval & Summaries]
+    P3 --> P35[Phase 3.5: Chat-tree Minimap]
+    P35 --> P4[Phase 4: Hybrid Retrieval & Summaries]
     P4 --> P5[Phase 5: Workflow DAG (optional)]
     P5 --> P6[Phase 6: Inspector & Metrics]
     P6 --> END[Final Demo & Evaluation]

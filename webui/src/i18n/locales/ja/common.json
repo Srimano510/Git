@@ -1401,6 +1401,7 @@
     "skill": "スキル: {{name}}",
     "askAboutSelection": "この内容について質問",
     "forkFromHere": "分岐",
+    "moreActions": "その他の操作",
     "copyReply": "コピー",
     "copiedReply": "コピー済み",
     "turnLatencyTitle": "応答時間（全行程）",

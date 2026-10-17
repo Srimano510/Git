@@ -1401,6 +1401,7 @@
     "skill": "Compétence : {{name}}",
     "askAboutSelection": "Poser une question à ce sujet",
     "forkFromHere": "Bifurquer",
+    "moreActions": "Plus d'actions",
     "copyReply": "Copier",
     "copiedReply": "Copié",
     "turnLatencyTitle": "Temps de réponse (de bout en bout)",

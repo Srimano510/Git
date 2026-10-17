@@ -5373,6 +5373,52 @@ async def test_handle_session_context_get_reads_detached_session() -> None:
     manager.read_session_snapshot.assert_called_once_with(session.key)
 
 
+@pytest.mark.asyncio
+async def test_handle_session_graph_get_returns_family_tree(tmp_path) -> None:
+    from urllib.parse import quote
+
+    from websockets.datastructures import Headers
+    from websockets.http11 import Request
+
+    from nanobot.session.manager import SessionManager
+
+    manager = SessionManager(tmp_path / "ws", sessions_root=tmp_path / "files")
+    src = manager.get_or_create("websocket:src")
+    src.add_message("user", "q1")
+    src.add_message("assistant", "a1")
+    manager.save(src)
+    child = manager.fork_session_before_user_index(src.key, "websocket:kid", 1)
+    child.add_message("user", "q2")
+    manager.save(child)
+    gateway = _basic_handler(MagicMock(), session_manager=manager)
+    gateway.tokens.api_tokens["tok"] = time.monotonic() + 300.0
+    auth = Headers([("Authorization", "Bearer tok")])
+
+    encoded = quote("websocket:kid", safe="")
+    response = await gateway.http._handle_session_graph_get(
+        Request(f"/api/sessions/{encoded}/graph", auth), encoded
+    )
+    assert response.status_code == 200
+    body = json.loads(response.body.decode())
+    assert body["root"] == "websocket:src"
+    assert set(body["tips"]) == {"websocket:src", "websocket:kid"}
+    assert {"source": "websocket:src#1", "target": "websocket:kid#2", "type": "BRANCH"} in body[
+        "edges"
+    ]
+
+    missing = quote("websocket:nope", safe="")
+    assert (
+        await gateway.http._handle_session_graph_get(
+            Request(f"/api/sessions/{missing}/graph", auth), missing
+        )
+    ).status_code == 404
+    denied = await gateway.http._handle_session_graph_get(
+        Request(f"/api/sessions/{encoded}/graph", Headers([])), encoded
+    )
+    assert denied.status_code == 401
+    assert manager.read_session_snapshot(src.key).messages[-1]["content"] == "a1"
+
+
 def test_handle_webui_thread_get_reports_registered_turn_as_pending(
     tmp_path,
     monkeypatch,

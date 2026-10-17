@@ -94,6 +94,12 @@ const SLASH_COMMANDS: SlashCommand[] = [
   },
 ];
 
+/** Fork now lives in each message's "More actions" menu. */
+function forkFromMenu(trigger: HTMLElement) {
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fork" }));
+}
+
 describe("MessageBubble", () => {
   it("renders user messages as right-aligned pills", () => {
     const message: UIMessage = {
@@ -110,7 +116,7 @@ describe("MessageBubble", () => {
     expect(row).toHaveClass("ml-auto", "flex");
     expect(pill).toHaveClass("ml-auto", "w-fit", "rounded-floating");
     expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fork" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
   });
 
   it("renders cross-session input with its public handle", () => {
@@ -417,7 +423,7 @@ describe("MessageBubble", () => {
 
     render(<MessageBubble message={message} onForkFromHere={onForkFromHere} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Fork" }));
+    forkFromMenu(screen.getByRole("button", { name: "More actions" }));
     expect(onForkFromHere).toHaveBeenCalledTimes(1);
   });
 
