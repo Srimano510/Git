@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, cast
 
 from nanobot.session import Session
@@ -30,7 +31,7 @@ def node_to_fork_args(messages: Sequence[Mapping[str, Any]], index: int) -> tupl
     return users_before, False
 
 
-def _text(message: Mapping[str, Any]) -> str:
+def message_text(message: Mapping[str, Any]) -> str:
     content = message.get("content")
     if isinstance(content, list):
         blocks = cast(list[Any], content)
@@ -43,7 +44,7 @@ def _text(message: Mapping[str, Any]) -> str:
 
 
 def _preview(message: Mapping[str, Any]) -> str:
-    text = " ".join(_text(message).split())
+    text = " ".join(message_text(message).split())
     return text if len(text) <= PREVIEW_CHARS else text[:PREVIEW_CHARS] + "…"
 
 
@@ -51,16 +52,24 @@ def _node_id(node: NodeId) -> str:
     return f"{node[0]}#{node[1]}"
 
 
-def build_tree_graph(
+@dataclass
+class Family:
+    """The chat family of one session: canonical nodes (aliased fork prefixes merged)."""
+
+    root: str
+    graph: ConversationGraph
+    nodes: set[NodeId]
+    tips: dict[str, str]
+    sessions: dict[str, Session]
+
+
+def load_family(
     key: str,
     session_rows: Sequence[Mapping[str, Any]],
     load_session: Callable[[str], Session | None],
-) -> dict[str, Any] | None:
-    """Return nodes, typed edges and per-chat tips for the family containing ``key``.
-
-    The family is the root fork source plus every session forked from it, recursively.
-    Returns ``None`` when ``key`` is unknown.
-    """
+) -> Family | None:
+    """Return the family containing ``key``: the root fork source plus every session
+    forked from it, recursively. ``None`` when ``key`` is unknown."""
     sessions: dict[str, Session] = {}
     for row in session_rows:
         k = row.get("key")
@@ -104,7 +113,21 @@ def build_tree_graph(
             tips[k] = _node_id(tip)
     for e in graph.edges:
         nodes.update((e.source, e.target))
+    return Family(root, graph, nodes, tips, sessions)
 
+
+def build_tree_graph(
+    key: str,
+    session_rows: Sequence[Mapping[str, Any]],
+    load_session: Callable[[str], Session | None],
+) -> dict[str, Any] | None:
+    """Return nodes, typed edges and per-chat tips for the family containing ``key``."""
+    family = load_family(key, session_rows, load_session)
+    if family is None:
+        return None
+    root, graph, nodes, tips, sessions = (
+        family.root, family.graph, family.nodes, family.tips, family.sessions,
+    )
     out_nodes: list[dict[str, Any]] = []
     for k, i in sorted(nodes):
         owner = sessions.get(k)
@@ -120,7 +143,7 @@ def build_tree_graph(
             "fork_before_user_index": node_to_fork_args(owner.messages, i)[0],
         }
         if m.get("role") == "user":
-            node["text"] = _text(m)  # lets the UI prefill a re-ask
+            node["text"] = message_text(m)  # lets the UI prefill a re-ask
         out_nodes.append(node)
     out_edges = sorted(
         (
@@ -129,4 +152,11 @@ def build_tree_graph(
         ),
         key=lambda e: (e["source"], e["target"], e["type"]),
     )
-    return {"root": root, "nodes": out_nodes, "edges": out_edges, "tips": tips}
+    result: dict[str, Any] = {"root": root, "nodes": out_nodes, "edges": out_edges, "tips": tips}
+    last = cast(object, sessions[key].metadata.get("_last_context"))  # last graph/hybrid turn
+    if isinstance(last, dict):
+        last_ctx = cast(dict[str, Any], last)
+        if isinstance(last_ctx.get("nodes"), dict):
+            result["context"] = last_ctx["nodes"]
+            result["context_strategy"] = last_ctx.get("strategy")
+    return result

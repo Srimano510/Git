@@ -50,6 +50,15 @@ class TranscriptionConfig(Base):
     max_upload_mb: int = Field(default=25, ge=1, le=100)
 
 
+class ContextGraphConfig(Base):
+    """Settings for the experimental ``hybrid`` (graph + semantic recall) context mode."""
+
+    semantic_pool: Literal["archived", "family"] = "archived"  # where recall may look
+    semantic_top_k: int = Field(default=3, ge=1)
+    semantic_min_score: float = Field(default=0.15, ge=0.0, le=1.0)
+    recall_token_budget: int = Field(default=1500, ge=1)
+
+
 class DreamConfig(Base):
     """Dream memory consolidation configuration."""
 
@@ -390,6 +399,13 @@ class ToolsConfig(Base):
     tool implementations.
     """
 
+    def __init__(self, **values: Any) -> None:
+        # Same lazy guard as ``Config``: if an import cycle left the forward references
+        # unresolved (e.g. ``import nanobot.session`` first), resolve them on first use.
+        if not type(self).__pydantic_complete__:
+            _resolve_tool_config_refs()
+        super().__init__(**values)
+
     web: WebToolsConfig = Field(default_factory=lambda: _lazy_default("nanobot.agent.tools.web", "WebToolsConfig"))
     exec: ExecToolConfig = Field(default_factory=lambda: _lazy_default("nanobot.agent.tools.shell", "ExecToolConfig"))
     file: FileToolsConfig = Field(default_factory=lambda: _lazy_default("nanobot.agent.tools.filesystem", "FileToolsConfig"))
@@ -432,6 +448,11 @@ class Config(BaseSettings):
     api: ApiConfig = Field(default_factory=ApiConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    context_graph: ContextGraphConfig = Field(
+        default_factory=ContextGraphConfig,
+        validation_alias=AliasChoices("contextGraph", "context_graph"),
+        serialization_alias="contextGraph",
+    )
     model_presets: dict[str, ModelPresetConfig] = Field(
         default_factory=dict,
         validation_alias=AliasChoices("modelPresets", "model_presets"),

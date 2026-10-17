@@ -1807,6 +1807,23 @@ describe("ThreadShell", () => {
     expect(badges().map((b) => b.textContent)).toEqual(["graph", "graph"]);
   });
 
+  it("offers a Hybrid strategy that syncs both toggles and sends /context hybrid", async () => {
+    const client = makeClient();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })));
+    render(
+      wrap(client, <ThreadShell session={session("hyb-chat")} title="Hyb" onToggleSidebar={() => {}} />),
+    );
+    const badges = () =>
+      screen.getAllByText(/^(linear|graph|hybrid)$/i).map((el) => el.closest("button") as HTMLElement);
+    await waitFor(() => expect(badges()).toHaveLength(2));
+    fireEvent.pointerDown(badges()[1], { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByText("Hybrid (Graph + Vector)"));
+    await waitFor(() =>
+      expect(client.sendSystemCommand).toHaveBeenCalledWith("hyb-chat", "/context hybrid"),
+    );
+    expect(badges().map((b) => b.textContent)).toEqual(["hybrid", "hybrid"]);
+  });
+
   it("sends normally when the tree selection is the tip", async () => {
     const client = makeClient();
     const onForkChat = vi.fn().mockResolvedValue("chat-fork");

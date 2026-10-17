@@ -1101,6 +1101,8 @@ The diamond-merge unit test in the generic guide should remain, but add a reposi
 
 ### Phase 4 owner decisions and deviations (2026-10-18)
 
+**Status: implemented 2026-10-18** (see `docs/PHASE4-PLAN.md` section 7 for as-built notes: the recalled block is a labelled "[Recalled Context]" section in the system prompt).
+
 Full plan: [docs/PHASE4-PLAN.md](docs/PHASE4-PLAN.md). Because Phase 3 removed the stored graph, this phase deviates from the text above: embeddings are a local hashed bag-of-words behind an `Embedder` interface; the vector index is **derived each turn** (no `save`/`load`/`reindex`, no index file); candidates come from a switchable pool (`archived` = own ancestry dropped by compaction, `family` = also sibling branches), config default plus per-session override; hits and summaries enter the prompt as **one synthetic recalled-context message**; summaries live in `session.metadata["context_summaries"]` and are created manually first (LLM generation later); the mode is a third strategy `hybrid`; the minimap shows a small marker set for recalled nodes (the full version belongs to Phase 6).
 
 ### Repository-specific implementation notes for Phase 4

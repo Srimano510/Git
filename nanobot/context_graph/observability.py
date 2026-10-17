@@ -17,6 +17,14 @@ class ContextResult:
     token_count: int = 0
     retrieval_ms: float = 0.0
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    recalled: str = ""  # hybrid mode: text for the system prompt, separate from ``messages``
+
+    def kinds(self) -> dict[str, str]:
+        """Why each node was used: ``history``, ``vector`` or ``summary``."""
+        return {
+            n: next((k for k in ("vector", "summary") if self.reasons.get(n, "").startswith(k)), "history")
+            for n in self.node_ids
+        }
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -27,4 +35,5 @@ class ContextResult:
             "token_count": self.token_count,
             "retrieval_ms": self.retrieval_ms,
             "diagnostics": self.diagnostics,
+            "recalled": self.recalled,
         }

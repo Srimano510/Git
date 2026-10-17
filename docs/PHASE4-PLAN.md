@@ -1,6 +1,6 @@
 # Phase 4 plan: hybrid retrieval (semantic recall) and summaries
 
-Status: **PLAN WRITTEN, owner decisions D1-D8 recorded (section 1). Waiting for the owner to commit the docs; no code written.**
+Status: **IMPLEMENTED 2026-10-18 on branch `phase4`, uncommitted. P4-0 to P4-11 done; see log.md and section 7. Browser-checked end to end with a mock LLM.**
 Branch: `phase4`. Spec: [MasterGuide-v3.md](../MasterGuide-v3.md), "Phase 4" (guide text is partly out of date, see section 2).
 Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Semantic recall and summaries are small additions on top of it.
 
@@ -101,3 +101,13 @@ New `ContextGraphConfig` section with defaults and camelCase aliases (old `confi
 - **Injection point** for the recalled message is unknown until P4-0; if no clean point exists, the fallback is the first-user-message prefix in the transcript builder. Will be reported before coding that step.
 - **`/context` replies are stored as chat messages** (REVIEW-LATER): `/context summary` and `/context hybrid` will add more of them. Noted, not fixed here.
 - The summary text is user-authored; it enters the prompt, so it is treated like any other user content (no special trust).
+
+## 7. As built (differences and findings)
+
+- **Injection:** the recalled block goes through the existing system-prompt path (`TranscriptInput.recalled_context` -> a "[Recalled Context]" section after the archived-summary section), not a separate chat message. Same intent as D4 (one labelled block, never splices raw messages), no new message plumbing. It is the last system-prompt section, so the provider's cacheable prefix is mostly unchanged, but the system prompt now varies per turn in `hybrid` mode.
+- **Recall pool:** `archived` is "own ancestry not in the replay", so it also covers messages dropped by the token budget, not only compaction. `family` adds sibling and descendant branches (shared `load_family` extracted from the Phase 3.5 tree builder).
+- **Summaries:** `session.metadata["context_summaries"]` entries are `{from, to, text}` on the session that owns the messages; a summary is used only when every covered ancestry node was dropped from the replay. A summary written in a fork over the copied prefix does not match (those nodes belong to the source session); write it on the source. Limitation, not fixed.
+- **Reserved budget:** in `hybrid` the history budget is `max_tokens - min(recallTokenBudget, max_tokens // 2)`.
+- **UI:** `/api/sessions/{key}/graph` gained additive `context` and `context_strategy`; the loop stores them in `session.metadata["_last_context"]` (dropped on fork). Minimap shows a "vector"/"summary" badge, an "in context" label on folded runs and a legend. Recalled nodes are never folded into runs.
+- **End-to-end proof:** with a seeded chat whose relevant exchange was archived, a real turn through the gateway sent a system prompt containing the recalled Postgres messages while the replayed history did not (mock LLM request log).
+- **Bugs found and fixed along the way:** (1) `ToolsConfig` was unresolved when `nanobot.session` or `nanobot.context_graph` was imported first (latent import-order bug, regression test added); (2) the WebUI sessions list never returned `context_strategy` (dropped by `_public_row`, missing in the fast-path row), so the toggle reset to "linear" on every reload since Phase 1 (regression test added, index version bumped to 9, cached indexes rebuild once); (3) `/context` had no tests at all (added).

@@ -2179,6 +2179,34 @@ The deprecated `agents.defaults.failOnToolError` field is silently ignored when 
 | `agents.defaults.maxConcurrentSubagents` | `4` | Maximum number of subagents that may run at the same time. Additional tasks wait for capacity. |
 
 
+## Context Graph (experimental)
+
+Per-session context strategies, switched with `/context <strategy>` or the toggle in the WebUI:
+
+- `linear` (default): replay the session history.
+- `graph`: walk the typed-edge DAG of the chat family (forks) instead of one flat history.
+- `hybrid`: `graph`, plus a "[Recalled Context]" block in the system prompt with older messages that match the current message (hashed bag-of-words similarity, no model or API key needed) and any manual summaries that stand in for dropped ranges.
+
+```json
+{
+  "contextGraph": {
+    "semanticPool": "archived",
+    "semanticTopK": 3,
+    "semanticMinScore": 0.15,
+    "recallTokenBudget": 1500
+  }
+}
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `semanticPool` | `archived` | Where recall may look. `archived`: this chat's own earlier messages that are no longer replayed (compacted or over budget). `family`: also every other branch of the chat family (breaks branch isolation, opt-in). |
+| `semanticTopK` | `3` | Maximum recalled messages per turn. |
+| `semanticMinScore` | `0.15` | Minimum similarity (0 to 1) for a message to be recalled. |
+| `recallTokenBudget` | `1500` | Token cap for the recalled block; the same amount is reserved from the history budget. |
+
+Per-session commands: `/context hybrid archived|family|default` (override the pool; `default` clears it), `/context summary <from> <to> <text>` (summarise messages `from..to` of this session; used only when those messages are not replayed), `/context summary` (list), `/context summary clear`. Message numbers are the node numbers shown in the WebUI chat tree. The tree marks what the last turn used (vector / summary / in context).
+
 ## Auto Compact
 
 When a user is idle for longer than a configured threshold, nanobot **proactively** compresses the older part of the session context into a summary while keeping a recent legal suffix of live messages. This reduces token cost and first-token latency when the user returns — instead of re-processing a long stale context with an expired KV cache, the model receives a compact summary, the most recent live context, and fresh input.

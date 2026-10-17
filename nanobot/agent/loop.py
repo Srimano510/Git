@@ -54,7 +54,7 @@ from nanobot.bus.outbound_events import StreamedResponseEvent
 from nanobot.bus.queue import MessageBus
 from nanobot.bus.runtime_events import RuntimeEventBus
 from nanobot.command import CommandContext, CommandRouter, register_builtin_commands
-from nanobot.config.schema import AgentDefaults, ModelPresetConfig
+from nanobot.config.schema import AgentDefaults, ContextGraphConfig, ModelPresetConfig
 from nanobot.context_graph import ContextResult, GraphContextEngine
 from nanobot.llm_usage.context import source_from_request
 from nanobot.providers.base import LLMProvider, LLMUsage, ProviderConversationState
@@ -273,6 +273,7 @@ class AgentLoop:
         max_concurrent_subagents: int | None = None,
         context_window_tokens: int | None = None,
         context_block_limit: int | None = None,
+        context_graph_config: ContextGraphConfig | None = None,
         max_tool_result_chars: int | None = None,
         provider_retry_mode: str = "standard",
         tool_hint_max_length: int | None = None,
@@ -354,6 +355,7 @@ class AgentLoop:
         )
         self.dream_model_preset = dream_model_preset
         self.context_block_limit = context_block_limit
+        self.context_graph_config = context_graph_config or ContextGraphConfig()
         self.max_tool_result_chars = (
             max_tool_result_chars
             if max_tool_result_chars is not None
@@ -514,6 +516,7 @@ class AgentLoop:
             max_concurrent_subagents=defaults.max_concurrent_subagents,
             context_window_tokens=context_window_tokens,
             context_block_limit=defaults.context_block_limit,
+            context_graph_config=config.context_graph,
             max_tool_result_chars=defaults.max_tool_result_chars,
             provider_retry_mode=defaults.provider_retry_mode,
             tool_hint_max_length=defaults.tool_hint_max_length,
@@ -732,6 +735,29 @@ class AgentLoop:
             return True
         return False
 
+    def _graph_context(
+        self,
+        session: Session,
+        strategy: str,
+        query: str | None,
+        extend_to_user: bool,
+    ) -> ContextResult:
+        """Build ``graph``/``hybrid`` context and remember which nodes the turn used."""
+        result = GraphContextEngine(
+            load_session=self.sessions.read_session_snapshot,
+            list_sessions=self.sessions.list_sessions,
+            config=self.context_graph_config,
+        ).build_context(
+            session,
+            max_tokens=self.context_window_tokens,
+            extend_to_user=extend_to_user,
+            hybrid=strategy == "hybrid",
+            query=query,
+            pool=session.metadata.get("context_pool"),
+        )
+        session.metadata["_last_context"] = {"strategy": result.strategy, "nodes": result.kinds()}
+        return result
+
     def _build_transcript_input(self, ctx: TurnContext) -> TranscriptInput:
         """Capture the persisted history and fresh input as separate transcript parts."""
         assert ctx.session is not None
@@ -741,6 +767,7 @@ class AgentLoop:
             media=ctx.msg.media if ctx.kind is TurnKind.USER and ctx.msg.media else None,
             session_summary=ctx.pending_summary,
             runtime_context_blocks=ctx.runtime_context_blocks,
+            recalled_context=ctx.context_result.recalled if ctx.context_result else None,
         )
 
     def _request_context_for_turn(self, ctx: TurnContext) -> RequestContext:
@@ -1910,13 +1937,12 @@ class AgentLoop:
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
         strategy = (session.metadata.get("context_strategy") or "linear").strip().lower()
-        if strategy in {"graph", "context_graph"}:
-            context_result = GraphContextEngine(
-                load_session=self.sessions.read_session_snapshot
-            ).build_context(
+        if strategy in {"graph", "context_graph", "hybrid"}:
+            context_result = self._graph_context(
                 session,
-                max_tokens=self.context_window_tokens,
-                extend_to_user=is_subagent,
+                strategy,
+                None if is_subagent else ctx.msg.content,
+                is_subagent,
             )
             ctx.context_result = context_result
             ctx.history = context_result.messages

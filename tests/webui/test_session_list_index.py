@@ -67,6 +67,24 @@ def test_webui_session_list_refreshes_after_model_preset_rename(tmp_path: Path) 
     assert list_webui_sessions(manager)[0]["model_preset"] == "Codex"
 
 
+@pytest.mark.parametrize("strategy", ["graph", "hybrid"])
+def test_webui_session_list_reports_the_context_strategy(tmp_path: Path, strategy: str) -> None:
+    manager = SessionManager(tmp_path)
+    session = manager.get_or_create("websocket:strategy")
+    session.metadata["context_strategy"] = strategy
+    session.add_message("user", "hello")
+    manager.save(session)
+    plain = manager.get_or_create("websocket:plain")
+    plain.add_message("user", "hi")
+    manager.save(plain)
+
+    # first call builds the index, second reads it back: both must carry the field
+    for _ in range(2):
+        rows = {r["key"]: r for r in list_webui_sessions(manager)}
+        assert rows["websocket:strategy"]["context_strategy"] == strategy
+        assert rows["websocket:plain"]["context_strategy"] == "linear"
+
+
 def test_webui_session_list_surfaces_pending_recovery_state(tmp_path: Path) -> None:
     manager = SessionManager(tmp_path)
     session = manager.get_or_create("websocket:needs-attention")

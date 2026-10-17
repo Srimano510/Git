@@ -81,6 +81,7 @@ class TranscriptInput:
     current_role: str = "user"
     session_summary: SessionSummary | None = None
     runtime_context_blocks: Sequence[RuntimeContextBlock] | None = None
+    recalled_context: str | None = None  # hybrid context mode: similarity/summary recall
 
     @property
     def message_count(self) -> int:
@@ -109,6 +110,7 @@ class ContextBuilder:
         session_summary: SessionSummary | None = None,
         workspace: Path | None = None,
         include_memory: bool = True,
+        recalled_context: str | None = None,
     ) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
         root = workspace or self.workspace
@@ -152,6 +154,9 @@ class ContextBuilder:
                 f"Previous conversation summary (last active {session_summary['last_active']}):\n"
                 f"{session_summary['text']}"
             )
+
+        if recalled_context:
+            parts.append(f"[Recalled Context]\n\n{recalled_context}")
 
         return "\n\n---\n\n".join(parts)
 
@@ -295,6 +300,7 @@ class ContextBuilder:
                     session_summary=transcript.session_summary,
                     workspace=root,
                     include_memory=include_memory,
+                    recalled_context=transcript.recalled_context,
                 ),
             },
             *transcript.history,
