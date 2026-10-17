@@ -12,7 +12,8 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Phase 1** (baseline context engine, graph data model, UI toggle): COMPLETE.
 - **Phase 2** (graph representation and branching, per [MasterGuide-v3.md](MasterGuide-v3.md)): COMPLETE.
 - **Phase 3** (typed-edge DAG context resolution): COMPLETE, uncommitted. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
-- **Open tasks**: none. Owner to review and commit Phase 3.
+- **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): PLAN APPROVED 2026-10-17 (decisions D1-D5 recorded in the plan; D1 = React Flow + dagre). Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md). Implementation starts after the owner commits the docs.
+- **Open tasks**: owner to commit Phase 3 and the Phase 3.5 docs; then start P3.5-0.
 
 ## Tasks
 
@@ -38,6 +39,19 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - [x] P3-7 Checks: context_graph 12/12; ruff clean; basedpyright 0 errors on touched files; full pytest 6306 passed, 5 failed (all pre-existing, see docs/REVIEW-LATER.md). WebUI untouched, so bun not run.
 - [x] P3-8 Docs: `docs/REVIEW-LATER.md`; `webui/build-errors.txt` kept per owner
 
+### Phase 3.5: Chat-tree minimap and node navigation (plan: docs/PHASE3_5-PLAN.md, approved)
+- [x] Owner decisions D1-D5 recorded (D1 React Flow + dagre; D2 one chat family; D3 explicit "branching from here" state; D4 user node = re-ask, assistant node keeps reply; D5 right-side collapsible panel)
+- [ ] P3.5-0 Fork-at-node contract tests (isolation, BRANCH edge, sibling exclusion) against existing fork code
+- [ ] P3.5-1 `node_to_fork_args` mapping + tests
+- [ ] P3.5-2 `build_tree_graph` (ancestors + descendants/siblings) + tests
+- [ ] P3.5-3 Read-only `GET /api/sessions/{key}/graph` + route test
+- [ ] P3.5-4 `bun add @xyflow/react @dagrejs/dagre` (local, approved); dagre tree layout + collapse of REPLY runs (unit-tested)
+- [ ] P3.5-5 `ChatMinimap` component on React Flow (pan/zoom, level-of-detail, built-in MiniMap overview)
+- [ ] P3.5-6 Click node -> open chat at that message
+- [ ] P3.5-7 Send from earlier node: fork then send (client orchestration)
+- [ ] P3.5-8 Checks (pytest, ruff, basedpyright, bun test/build)
+- [ ] P3.5-9 Docs
+
 ## Change log
 
 Newest record last. Each record: timestamp, step, what changed, commit, status.
@@ -56,6 +70,8 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-10-16 | Phase 3 prep | Added `docs/PHASE3-PLAN.md`; added Phase 3 tasks to `log.md`; `AGENTS.md` Git & Commits: plan in `docs/` then wait for approval, owner commits | uncommitted | SUCCESS |
 | 2026-10-16 | Phase 3 prep | Owner answers Q1-Q4 + cut depth; rewrote `docs/PHASE3-PLAN.md` (rev 2: DAG derived from sessions, delete store/sync layer); added project-goal line atop `AGENTS.md` | uncommitted | SUCCESS |
 | 2026-10-16 | Phase 3 | Added `resolver.py`, `derive.py`; rewrote `model.py`, `engines.py`, `__init__.py`; deleted `store.py`, `sync.py` and tests `test_store/test_linear_engine/test_model/test_branching`; added `test_resolver.py`, rewrote `test_graph_engine.py` (7 tests); `session/manager.py` fork no longer writes graph id or re-saves source; `agent/loop.py` uses `GraphContextEngine` for graph and `session.get_history` for linear; added `docs/REVIEW-LATER.md` | uncommitted | SUCCESS |
+| 2026-10-17 | Phase 3.5 plan | Read-only audit of fork logic (`session/manager.py`, `webui/forking.py`, `context_graph/derive.py`); added `docs/PHASE3_5-PLAN.md`; added Phase 3.5 tasks to `log.md`; split windows moved to `docs/REVIEW-LATER.md`; MasterGuide Phase 3.5 note. No code changed. Finding: send-from-earlier-node does not auto-branch today (fork is an explicit button) | uncommitted | SUCCESS |
+| 2026-10-17 | Phase 3.5 plan | Owner answered D1-D5; plan marked APPROVED; D1 changed to React Flow + dagre (least effort, size not a concern); `MasterGuide-v3.md` Phase 3.5 status updated. No code changed | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`
