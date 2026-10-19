@@ -73,6 +73,7 @@ _FORK_VOLATILE_METADATA_KEYS = {
     "context_graph_fork_boundary",
     "_last_context",
     "_last_workflow",
+    "_last_turn",
 }
 _WORKSPACE_STATE_DIR = ".nanobot"
 _WORKSPACE_ID_FILE = "workspace-id"

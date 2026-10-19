@@ -1384,6 +1384,37 @@
       "strategyHybrid": "Hibrida (graf + vektor)",
       "strategyTooltip": "Ubah strategi konteks"
     },
+    "observatory": {
+      "title": "Observatorium konteks",
+      "open": "Konteks",
+      "close": "Tutup",
+      "loading": "Memuat konteks…",
+      "empty": "Kirim pesan untuk melihat bagaimana konteks dibuat.",
+      "error": "Tidak dapat memuat konteks: {{message}}",
+      "query": "Pesan terakhir: {{text}}",
+      "reconstructed": "Dibangun ulang dari obrolan seperti sebelum giliran terakhir. Pemadatan setelahnya dapat membuatnya berbeda dari yang diterima model.",
+      "strategy": {
+        "linear": "Linear",
+        "graph": "Graf",
+        "hybrid": "Hibrida"
+      },
+      "used": "dipakai untuk giliran ini",
+      "nodes": "{{count}} node",
+      "tokens": "{{count}} token",
+      "ms": "{{value}} md",
+      "recalled": "{{count}} dipanggil kembali",
+      "onlyIn": "{{count}} hanya di sini",
+      "fallback": "Kembali ke: {{reason}}",
+      "timing": "Waktu (diukur pada pembangunan ulang)",
+      "traversal": "penelusuran",
+      "vector": "vektor",
+      "total": "total",
+      "diffOnly": "Hanya perbedaan",
+      "colNode": "Node",
+      "colExcerpt": "Cuplikan",
+      "colTokens": "Token",
+      "colReason": "Alasan"
+    },
     "promptNavigator": {
       "open": "Buka navigasi instruksi",
       "title": "Instruksi",

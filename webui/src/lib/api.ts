@@ -318,6 +318,51 @@ export async function fetchSessionGraph(
   );
 }
 
+export type ObservatoryStrategy = "linear" | "graph" | "hybrid";
+
+export interface ObservatoryStrategyInfo {
+  nodes: number;
+  tokens: number;
+  ms: number;
+  fallback: string | null;
+  timing: { traversal_ms: number; vector_ms: number; total_ms: number };
+  recalled?: number;
+  summaries?: number;
+}
+
+export interface ObservatoryNode {
+  id: string;
+  role: string | null;
+  excerpt: string;
+  tokens: number;
+  in: Record<ObservatoryStrategy, boolean>;
+  reason: Partial<Record<ObservatoryStrategy, string>>;
+}
+
+/** Linear, graph and hybrid contexts rebuilt for the last turn (a reconstruction). */
+export interface ObservatoryPayload {
+  at: number;
+  selected: ObservatoryStrategy | null;
+  reconstructed: boolean;
+  query: string;
+  strategies: Record<ObservatoryStrategy, ObservatoryStrategyInfo>;
+  nodes: ObservatoryNode[];
+  only: Record<ObservatoryStrategy, number>;
+}
+
+export async function fetchContextResult(
+  token: string,
+  key: string,
+  base: string = "",
+): Promise<ObservatoryPayload> {
+  return request<ObservatoryPayload>(
+    `${base}/api/sessions/${encodeURIComponent(key)}/context-result`,
+    token,
+    undefined,
+    API_READ_TIMEOUT_MS,
+  );
+}
+
 export async function fetchAutomations(
   token: string,
   base: string = "",

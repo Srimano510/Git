@@ -1353,6 +1353,10 @@ Not much new; we may augment `ContextResult`:
 
 Phase 4 ships only a **small** minimap marker set (history / vector / summary) and stores the last turn's node reasons in `session.metadata["_last_context"]`. Phase 6 should replace this with the **full Observatory** (strategy comparison, per-node reasons, token breakdown) and add the missing `/api/sessions/{key}/context-result` route that `ContextObservatory.tsx` already calls.
 
+### Phase 6 owner decisions and deviations (2026-10-19)
+
+**Status: implemented 2026-10-19** (as-built notes in `docs/PHASE6-PLAN.md` section 6). Full plan: [docs/PHASE6-PLAN.md](docs/PHASE6-PLAN.md). Because the loop runs only the selected engine, the comparison is **rebuilt on demand** by a new route from the chat truncated to before the last turn (the loop records `_last_turn` with the message count, budget and config); it compares **linear, graph and hybrid**; the existing Phase 1 `ContextObservatory.tsx` drawer is **rewritten in place** (it currently calls a missing route, sends no token and is mounted with `sessionKey="current"`). Timing is traversal / vector / total (no separate ranking step). Relevant/irrelevant counts exist only for the scripted demo (`scripts/seed_demo.py`, whose merge is a `CONTEXT` edge written by the script; no `/context link`). Slides and demo scenario are docs only (`docs/DEMO-SCENARIO.md`).
+
 ### Repository-specific implementation notes for Phase 6
 
 Build the Context Observatory into the existing React/TypeScript WebUI.

@@ -178,3 +178,41 @@ def test_merged_forks_pass_through_context_builder_unchanged(tmp_path):
     assert texts(result)[-2:] == ["Branch A work", "Branch B work"]
     assert [m["content"] for m in transcript[1:-1]] == texts(result)
     assert transcript[-1]["role"] == "user"
+
+
+def command_session() -> Session:
+    s = Session(key="s")
+    s.add_message("user", "Which database should the orders service use?")
+    s.add_message("assistant", "Use Postgres for the orders database.")
+    s.add_message("user", "/context hybrid", _command=True)
+    s.add_message("assistant", "Switched context strategy to `hybrid`.", _command=True)
+    s.last_archived = 2  # everything before the commands is compacted away
+    return s
+
+
+def test_replay_of_only_command_turns_is_empty_not_a_fallback():
+    result = GraphContextEngine().build_context(command_session())
+    assert result.messages == [] and result.node_ids == []
+    assert result.diagnostics["fallback"] is None
+
+
+def test_hybrid_still_recalls_archived_facts_after_a_command_turn():
+    result = GraphContextEngine().build_context(
+        command_session(), hybrid=True, query="which database for the orders service"
+    )
+    assert result.diagnostics["fallback"] is None
+    assert "Postgres" in result.recalled
+
+
+def test_command_turns_in_the_middle_do_not_shift_node_ids():
+    s = Session(key="s")
+    for role, text, extra in [
+        ("user", "q0", {}), ("assistant", "a1", {}),
+        ("user", "/context graph", {"_command": True}),
+        ("assistant", "switched", {"_command": True}),
+        ("user", "q4", {}), ("assistant", "a5", {}),
+    ]:
+        s.add_message(role, text, **extra)
+    result = GraphContextEngine().build_context(s)
+    assert texts(result) == ["q0", "a1", "q4", "a5"]
+    assert result.node_ids == ["s#0", "s#1", "s#4", "s#5"]

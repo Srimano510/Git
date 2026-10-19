@@ -1384,6 +1384,37 @@
       "strategyHybrid": "Lai (đồ thị + vector)",
       "strategyTooltip": "Đổi chiến lược ngữ cảnh"
     },
+    "observatory": {
+      "title": "Đài quan sát ngữ cảnh",
+      "open": "Ngữ cảnh",
+      "close": "Đóng",
+      "loading": "Đang tải ngữ cảnh…",
+      "empty": "Gửi một tin nhắn để xem ngữ cảnh được xây dựng như thế nào.",
+      "error": "Không thể tải ngữ cảnh: {{message}}",
+      "query": "Tin nhắn cuối: {{text}}",
+      "reconstructed": "Được dựng lại từ cuộc trò chuyện như trước lượt cuối. Việc nén sau đó có thể khiến kết quả khác với những gì mô hình nhận được.",
+      "strategy": {
+        "linear": "Tuyến tính",
+        "graph": "Đồ thị",
+        "hybrid": "Kết hợp"
+      },
+      "used": "được dùng cho lượt này",
+      "nodes": "{{count}} nút",
+      "tokens": "{{count}} token",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}} được gợi lại",
+      "onlyIn": "{{count}} chỉ có ở đây",
+      "fallback": "Dự phòng: {{reason}}",
+      "timing": "Thời gian (đo khi dựng lại)",
+      "traversal": "duyệt",
+      "vector": "vector",
+      "total": "tổng",
+      "diffOnly": "Chỉ khác biệt",
+      "colNode": "Nút",
+      "colExcerpt": "Trích đoạn",
+      "colTokens": "Token",
+      "colReason": "Lý do"
+    },
     "promptNavigator": {
       "open": "Mở trình điều hướng lời nhắc",
       "title": "Lời nhắc",

@@ -5420,6 +5420,58 @@ async def test_handle_session_graph_get_returns_family_tree(tmp_path) -> None:
     assert manager.read_session_snapshot(src.key).messages[-1]["content"] == "a1"
 
 
+@pytest.mark.asyncio
+async def test_handle_session_context_result_get_compares_strategies_per_chat(tmp_path) -> None:
+    from urllib.parse import quote
+
+    from websockets.datastructures import Headers
+    from websockets.http11 import Request
+
+    from nanobot.session.manager import SessionManager
+
+    manager = SessionManager(tmp_path / "ws", sessions_root=tmp_path / "files")
+    for key, word in (("websocket:a", "alpha"), ("websocket:b", "beta")):
+        s = manager.get_or_create(key)
+        s.add_message("user", f"{word} question")
+        s.add_message("assistant", f"{word} answer")
+        s.metadata["_last_turn"] = {
+            "strategy": "graph", "at": 2, "max_tokens": 100000, "graph_config": {},
+        }
+        s.add_message("user", f"{word} follow-up")
+        manager.save(s)
+    fresh = manager.get_or_create("websocket:fresh")
+    fresh.add_message("user", "no recorded turn")
+    manager.save(fresh)
+    gateway = _basic_handler(MagicMock(), session_manager=manager)
+    gateway.tokens.api_tokens["tok"] = time.monotonic() + 300.0
+    auth = Headers([("Authorization", "Bearer tok")])
+
+    async def get(key, headers=auth):
+        enc = quote(key, safe="")
+        return await gateway.http._handle_session_context_result_get(
+            Request(f"/api/sessions/{enc}/context-result", headers), enc
+        )
+
+    first = await get("websocket:a")
+    assert first.status_code == 200
+    body = json.loads(first.body.decode())
+    assert body["selected"] == "graph" and body["query"] == "alpha follow-up"
+    assert {n["id"] for n in body["nodes"]} == {"websocket:a#0", "websocket:a#1"}
+    assert "beta" not in first.body.decode()
+    again = json.loads((await get("websocket:a")).body.decode())  # after a page refresh
+    assert (again["nodes"], again["only"], again["query"]) == (
+        body["nodes"], body["only"], body["query"],
+    )
+    assert {n["id"][:11] for n in json.loads((await get("websocket:b")).body.decode())["nodes"]} == {
+        "websocket:b"
+    }
+
+    assert (await get("websocket:fresh")).status_code == 404
+    assert (await get("websocket:nope")).status_code == 404
+    assert (await get("websocket:a", Headers([]))).status_code == 401
+    assert (await get("cli:a")).status_code == 404
+
+
 def test_handle_webui_thread_get_reports_registered_turn_as_pending(
     tmp_path,
     monkeypatch,

@@ -1398,6 +1398,37 @@
       "strategyHybrid": "Hybrid (Graph + Vector)",
       "strategyTooltip": "Change context strategy"
     },
+    "observatory": {
+      "title": "Context Observatory",
+      "open": "Context",
+      "close": "Close",
+      "loading": "Loading context…",
+      "empty": "Send a message to see how the context was built.",
+      "error": "Could not load context: {{message}}",
+      "query": "Last message: {{text}}",
+      "reconstructed": "Rebuilt from the chat as it was before the last turn. Compaction since then can make it differ from what the model received.",
+      "strategy": {
+        "linear": "Linear",
+        "graph": "Graph",
+        "hybrid": "Hybrid"
+      },
+      "used": "used for this turn",
+      "nodes": "{{count}} nodes",
+      "tokens": "{{count}} tokens",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}} recalled",
+      "onlyIn": "{{count}} only here",
+      "fallback": "Fell back: {{reason}}",
+      "timing": "Timing (measured on the rebuild)",
+      "traversal": "traversal",
+      "vector": "vector",
+      "total": "total",
+      "diffOnly": "Differences only",
+      "colNode": "Node",
+      "colExcerpt": "Excerpt",
+      "colTokens": "Tokens",
+      "colReason": "Why"
+    },
     "promptNavigator": {
       "open": "Open prompt navigator",
       "title": "Prompts",
