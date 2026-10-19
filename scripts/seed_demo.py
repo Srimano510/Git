@@ -37,6 +37,9 @@ NOISE_QUESTION = "Which database holds the orders service, and where do we deplo
 # History tokens for graph/hybrid in the noise scenario (config: graphTokenBudget). About 40% of the
 # full history (471 tokens); chosen after a sweep (docs/PHASES7-11-PLAN.md): 4/4 relevant from 150 up.
 NOISE_BUDGET = 200
+# The seeded chats end with the recorded turn answered, so a live question is never merged with an
+# unanswered one by the provider layer.
+RECORDED_REPLY = "(Recorded reply of the seeded turn. Ask a new question to run a live one.)"
 
 PROJECT = [
     ("user", "I'm building an AI agent for customer support."),
@@ -122,6 +125,7 @@ def seed(manager: SessionManager) -> dict[str, str]:
         "graph_config": ContextGraphConfig().model_dump(),
     }
     root.add_message("user", QUESTION)
+    root.add_message("assistant", RECORDED_REPLY)
     manager.save(root)
     return {
         f"{ROOT}#2": "Postgres decision (archived)",
@@ -147,6 +151,7 @@ def seed_noise(manager: SessionManager) -> dict[str, str]:
         "graph_config": ContextGraphConfig(graph_token_budget=NOISE_BUDGET).model_dump(),
     }
     chat.add_message("user", NOISE_QUESTION)
+    chat.add_message("assistant", RECORDED_REPLY)
     manager.save(chat)
     return {
         f"{NOISE}#0": "Postgres decision",

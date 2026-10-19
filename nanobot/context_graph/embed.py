@@ -162,11 +162,25 @@ def make_embedder(config: ContextGraphConfig) -> Embedder:
     return _EMBEDDERS[key]
 
 
-if __name__ == "__main__":  # python -m nanobot.context_graph.embed [model]: download once, then show a sample
-    import sys
+def main(argv: list[str] | None = None) -> int:
+    """``python -m nanobot.context_graph.embed [model] [--config config.json]``: download the
+    model once into that config's data directory and show a similarity sample."""
+    import argparse
 
-    name = sys.argv[1] if len(sys.argv) > 1 else "minishlab/potion-base-8M"
-    e = Model2VecEmbedder(name, allow_download=True)
-    print(f"{name} ready in {_models_dir()}")
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("model", nargs="?", default="minishlab/potion-base-8M")
+    parser.add_argument("-c", "--config", type=Path, help="the instance whose data directory should hold the model")
+    args = parser.parse_args(argv)
+    if args.config:
+        from nanobot.config.loader import set_config_path
+
+        set_config_path(args.config)
+    e = Model2VecEmbedder(args.model, allow_download=True)
+    print(f"{args.model} ready in {_models_dir()}")
     print("car vs automobile:", round(cosine(e.embed("car"), e.embed("automobile")), 2))
     print("car vs banana:", round(cosine(e.embed("car"), e.embed("banana")), 2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

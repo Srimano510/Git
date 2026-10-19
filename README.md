@@ -3,6 +3,8 @@
   <img alt="nanobot README cover" src="./images/readme-cover-light.svg">
 </picture>
 
+> **Student demo fork:** this fork adds typed-edge DAG context building (graph, hybrid recall, summaries, an Observatory). Start with [demo.md](demo.md).
+
 <div align="center">
   <p>
     <a href="https://nanobot.wiki/docs/latest/getting-started/nanobot-overview">English</a> |

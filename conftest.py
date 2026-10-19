@@ -50,6 +50,18 @@ def _isolate_sessions_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> I
 
 
 @pytest.fixture(autouse=True)
+def _isolate_embedder_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep tests from picking up a downloaded semantic model.
+
+    "auto" uses the model only when it is already in the model directory, so without this a
+    developer machine that has it would run tests with real embeddings while CI runs hashed
+    words. Tests that want a model pass their own ``cache_dir`` or a fake.
+    """
+    monkeypatch.setattr("nanobot.context_graph.embed._models_dir", lambda: tmp_path / "models-hub")
+    monkeypatch.setattr("nanobot.context_graph.embed._EMBEDDERS", {})
+
+
+@pytest.fixture(autouse=True)
 def _isolate_pairing_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep channel pairing tests out of the user's active pairing store."""
     pairing_path = tmp_path / "pairing.json"

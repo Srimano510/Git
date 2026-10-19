@@ -206,3 +206,40 @@ def test_a_missing_model_is_downloaded_only_when_allowed(monkeypatch):
     with pytest.raises(FileNotFoundError):
         Model2VecEmbedder("org/m", allow_download=False)
     assert hub2.calls == [True]  # never went online
+
+
+def test_prefetch_downloads_into_the_data_dir_of_the_config_it_is_given(monkeypatch, tmp_path, capsys):
+    """`python -m nanobot.context_graph.embed --config <demo config>` must fill that instance's
+    model directory, not the default one, or "auto" would silently fall back to hashed words."""
+    import json
+
+    from nanobot.config.paths import get_data_dir
+    from nanobot.context_graph.embed import main as prefetch
+
+    config = tmp_path / "demo" / "config.json"
+    config.parent.mkdir()
+    config.write_text(json.dumps({}))
+    seen = {}
+
+    class Spy:
+        default_min_score = 0.3
+
+        def __init__(self, model_name, *, allow_download, **kw):
+            seen["model"], seen["download"] = model_name, allow_download
+            seen["dir"] = embed_module._models_dir()
+
+        def embed(self, text):
+            return {0: 1.0}
+
+    monkeypatch.undo()  # the autouse isolation patches _models_dir; this test wants the real one
+    monkeypatch.setattr(embed_module, "Model2VecEmbedder", Spy)
+    try:
+        assert prefetch(["org/model", "--config", str(config)]) == 0
+        assert seen["model"] == "org/model" and seen["download"] is True
+        assert str(seen["dir"]).startswith(str(config.parent))  # under the instance, not ~/.nanobot
+        assert "ready" in capsys.readouterr().out
+    finally:
+        import nanobot.config.loader as loader
+
+        loader._current_config_path = None  # do not leak the demo config into later tests
+    assert get_data_dir() != config.parent

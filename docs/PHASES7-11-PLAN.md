@@ -1,6 +1,6 @@
 # Phases 7 to 11 plan: from "more complete" to "complete AND selective", plus a demo kit
 
-Status: **Phases 7 to 10 IMPLEMENTED 2026-10-19 (as-built notes in sections 10 to 13); Phase 11 planned, waiting for approval.**
+Status: **Phases 7 to 11 IMPLEMENTED 2026-10-19 (as-built notes in sections 10 to 14).**
 Branch for planning: `phase7`. Each phase gets its own branch (`phase7` ... `phase11`) and its own commit(s) by the owner. Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Everything below either *proves* the claim, *removes a known gap*, or *makes the demo safe*.
 
 ## 1. Project goals (owner answers, 2026-10-19)
@@ -199,7 +199,7 @@ Things I suggest adding to demonstrate the goal best (all inside the tasks above
 - **Per-embedder recall cut-off (not planned).** `semanticMinScore` is now unset by default and each embedder carries its own (`hash` 0.15, `model2vec` 0.30). Measured with the real model: unrelated messages score up to 0.21 (noise scenario) and 0.17 (merge scenario), relevant ones from 0.39; with the old 0.15 the dense model let 5 of 28 noise messages (11 of 12 in the merge demo) through and hybrid carried 3 irrelevant recalled messages. An explicit config value still wins.
 - **Model files:** `snapshot_download` is limited to the three files a static model needs (`config.json`, `model.safetensors`, `tokenizer.json`); without that the local-only check called the cache "incomplete".
 - **Cache location:** `<data dir>/models/hub`. The data dir follows the active config (`~/.nanobot` for the default config), so each instance has its own copy.
-- **No env-var override:** the root `conftest.py` already redirects the data dir per test, so tests never see a real model; "auto" falls back to hashed words there.
+- **No env-var override** (and a correction found in Phase 11): this note first claimed the root `conftest.py` already redirects the model directory per test. It only redirected the *session* store, so on a machine with the model downloaded "auto" silently ran tests with real embeddings while CI used hashed words. Fixed in Phase 11 with an autouse fixture (section 14).
 - **Budget semantics:** `graphTokenBudget` is the *history* budget for graph and hybrid; the recalled block keeps its own cap, so hybrid can exceed it by at most `recallTokenBudget`.
 
 **Pass criteria (fixed before building, section 4.3) and results.** Noise scenario: 16 turns, the two relevant ones first (4 messages), 14 small-talk turns; final question needs both facts. Linear replays all 32 messages (471 tokens).
@@ -286,3 +286,21 @@ The claim holds at every budget from 150 up with both embedders. At 100 tokens, 
 - Generation costs one model call per command and blocks that command until it returns (no progress indicator); the command has no timeout of its own beyond the provider's retries.
 - A summary stands in for turns it *fully* covers. A range that cuts through a turn leaves that turn competing normally.
 - Automatic summaries on compaction were deliberately not built.
+
+## 14. Phase 11 as built (differences and findings)
+
+**Built as planned:** `scripts/mock_llm.py`, `scripts/preflight.py`, `scripts/seed_demo.py` (final: both scenarios, answered seeded turns), root `demo.md` (the two `docs/DEMO-*.md` files are folded in and removed; no dead local links), a README pointer, and `docs/demo/*.png` (8 screenshots from the rehearsal, about 0.8 MB).
+
+**Added beyond the plan**
+- **`scripts/demo_setup.py`:** one command writes a separate demo instance (config, workspace, seeded chats) for `--provider mock` or `--provider zen --model <id>`. Without it the setup is hand-edited JSON. The Zen key is written as `${OPENCODE_API_KEY}`, never as a value. Demo ports (8775, 18795) differ from the defaults (8765, 18790) so a gateway you already run is not disturbed.
+- **`python -m nanobot.context_graph.embed --config <config>`:** the model prefetch gained `--config`. Without it the model downloaded into the default data dir while the demo instance has its own, so "auto" would silently fall back to hashed words (found while writing the setup steps; test added).
+- **Context-sensitive mock:** it answers only from facts present in the request (history and `[Recalled Context]`), so linear, graph and hybrid visibly differ without a real model; answers carry "(mock LLM)".
+- **Preflight resolves `${VAR}` references** the way the gateway does (`resolve_config_env_vars`). `load_config` leaves them as literal text, which would otherwise count a missing environment variable as a valid key; the error names the variable, never a value. `--live` scrubs the key from any error.
+
+**Found and fixed**
+- **Tests depended on the machine:** `conftest.py` now points the embedder's model directory at an empty temp dir and resets the embedder cache for every test (see the correction in section 10). The whole suite passes with it.
+- **Seeded chats ended in an unanswered question** (the Phase 9 artifact). Both seeds now append a recorded reply, so a live question is never merged with an unanswered one.
+
+**Rehearsed end to end with the documented commands** (temp instance, mock model, real model2vec downloaded into the instance by the documented command, Playwright): `demo_setup`, the prefetch, `mock_llm`, `preflight` (9 of 9 PASS), `nanobot gateway`, and all five acts of the script in `demo.md`. Results: the synergy question is "can't find" before the link and found after (act 2); the Postgres question is "can't find" under linear and graph and answered under hybrid, whose request carried the recalled block (act 3); the noise question gets the identical answer under linear (34 nodes / 512 tokens recorded) and hybrid (10 / 188) (act 4); the generated summary reaches the model and the small talk does not (act 5). The seeded views read "Rebuilt..." and live turns "Recorded...". Numbers in `demo.md` were regenerated from the final code (`seed_demo --report`).
+
+**Not done, stated plainly:** no real model was run (no key here), so the OpenCode Zen path, model ids and latency are unverified; `preflight --live` exists to check them before the demo. Summary quality with a real model is unjudged. The Zen model list in `demo.md` comes from the Zen docs page read on 2026-10-19 and may rotate.
