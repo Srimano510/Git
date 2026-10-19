@@ -151,6 +151,35 @@ def _without_commands(
     return edges, nodes - skip, {k: visible_tip(t) for k, t in tips.items()}
 
 
+def _workflow(session: Session, shown: set[str]) -> dict[str, Any] | None:
+    """The last turn's workflow trace, hung off the user message it was built for."""
+    wf = cast(object, session.metadata.get("_last_workflow"))
+    if not isinstance(wf, dict):
+        return None
+    record = cast(dict[str, Any], wf)
+    at = record.get("at")
+    if not isinstance(at, int) or not record.get("nodes"):
+        return None
+    anchor = next(
+        (
+            _node_id((session.key, i))
+            for i in range(at, len(session.messages))
+            if session.messages[i].get("role") == "user"
+            and not session.messages[i].get("_command")
+            and not is_hidden_history_message(session.messages[i])
+        ),
+        None,
+    )
+    if anchor is None or anchor not in shown:
+        return None
+    first = record["nodes"][0]["id"]
+    return {
+        "anchor": anchor,
+        "nodes": record["nodes"],
+        "edges": [{"source": anchor, "target": first, "type": "TRIGGERS"}, *record.get("edges", [])],
+    }
+
+
 def build_tree_graph(
     key: str,
     session_rows: Sequence[Mapping[str, Any]],
@@ -195,4 +224,6 @@ def build_tree_graph(
         if isinstance(last_ctx.get("nodes"), dict):
             result["context"] = last_ctx["nodes"]
             result["context_strategy"] = last_ctx.get("strategy")
+    if (workflow := _workflow(sessions[key], {n["id"] for n in out_nodes})) is not None:
+        result["workflow"] = workflow
     return result

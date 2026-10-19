@@ -180,3 +180,35 @@ def test_slash_command_turns_are_left_out_and_the_chain_is_bridged(tmp_path):
         ("websocket:cmd#4", "websocket:cmd#5"),
     }
     assert result["tips"] == {"websocket:cmd": "websocket:cmd#5"}
+
+
+def test_workflow_field_is_anchored_to_its_own_turn_and_absent_without_a_record(tmp_path):
+    sessions = make_manager(tmp_path)
+    source = seed(sessions)
+    assert "workflow" not in tree(sessions, source.key)
+
+    wf = {
+        "at": 2, "strategy": "graph",
+        "nodes": [{"id": "workflow#0", "label": "ContextStrategySelection", "type": "intent"}],
+        "edges": [],
+    }
+    source.metadata["_last_workflow"] = wf
+    sessions.save(source)
+    result = tree(sessions, source.key)["workflow"]
+    # the turn was built when 2 messages existed, so its user message is index 2
+    assert result["anchor"] == "websocket:source#2"
+    assert result["nodes"] == wf["nodes"]
+    assert {"source": "websocket:source#2", "target": "workflow#0", "type": "TRIGGERS"} in result["edges"]
+
+    source.add_message("user", "/context linear", _command=True)
+    source.add_message("user", "a newer question")
+    sessions.save(source)
+    assert tree(sessions, source.key)["workflow"]["anchor"] == "websocket:source#2"
+
+    source.metadata["_last_workflow"] = {"at": 99, "nodes": [], "edges": []}
+    sessions.save(source)
+    assert "workflow" not in tree(sessions, source.key)
+
+    source.metadata["_last_workflow"] = "garbage"
+    sessions.save(source)
+    assert "workflow" not in tree(sessions, source.key)

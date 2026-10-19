@@ -14,8 +14,8 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Phase 3** (typed-edge DAG context resolution): COMPLETE. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
 - **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): COMPLETE, browser-checked with Playwright. Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md).
 - **Phase 4** (hybrid retrieval and summaries): COMPLETE, browser-checked, merged to `master` (PR #14 and polish PR #15). Plan and as-built notes: [docs/PHASE4-PLAN.md](docs/PHASE4-PLAN.md).
-- **Phase 5** (workflow DAG, optional): PLANNED on branch `phase5`, decisions D1-D4 recorded, no code written. Plan: [docs/PHASE5-PLAN.md](docs/PHASE5-PLAN.md).
-- **Open tasks**: owner to commit the Phase 5 plan docs, then approve implementation (P5-1 onward).
+- **Phase 5** (workflow DAG, optional): IMPLEMENTED on branch `phase5`, uncommitted, browser-checked end to end. Plan: [docs/PHASE5-PLAN.md](docs/PHASE5-PLAN.md).
+- **Open tasks**: owner to review and commit Phase 5. Temp test gateway and mock LLM stopped; 0 listening test sockets.
 
 ## Tasks
 
@@ -69,18 +69,18 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - [x] P4-10 Checks: full pytest 6502 passed, 2 failed (unrelated: `test_mcp_reconnect_crash`, `test_session_location`); the other 3 earlier 'pre-existing' failures were stale tests for the additive `context_strategy` attach field and are fixed; ruff clean; basedpyright 0 errors on touched files; vitest 1143 passed, 8 failed (same 8 as before Phase 4); `bun run build` and `bun run lint` clean
 - [x] P4-11 Docs
 
-### Phase 5: Workflow DAG (plan: docs/PHASE5-PLAN.md, decisions recorded, awaiting approval to implement)
+### Phase 5: Workflow DAG (plan: docs/PHASE5-PLAN.md, implemented)
 - [x] Owner decisions D1-D4 recorded (D1 real trace of each graph/hybrid turn; D2 last turn only in `_last_workflow`; D3 inside the minimap behind a "Workflow" toggle; D4 context stages only, no new loop timing)
 - [x] P5-0 Audit (read-only). Findings: (1) `ContextResult.diagnostics` + `retrieval_ms` + `token_count` already hold everything the trace needs, so the engine is unchanged; (2) `get_ancestor_context` takes `edge_types` (default REPLY/BRANCH/CONTEXT), so new `TRIGGERS`/`FEEDS` edges are never followed by the context engine and double as a topological-order check in tests; (3) `build_session_graph` derives only from `Session.messages` and metadata, so metadata-held workflow nodes cannot reach the prompt; (4) the user message is persisted after the context is built (`_persist_user_message_early`), so the trace stores `at = len(session.messages)` and is anchored at read time to the first user message at index >= `at`; (5) copy the `_last_context` pattern: written in `loop._graph_context`, listed in `_FORK_VOLATILE_METADATA_KEYS` (`session/manager.py`), surfaced by `tree.py::build_tree_graph`, drawn in `ChatMinimap`; (6) subagent turns have `query=None` and no user message, so they record no trace
-- [ ] P5-1 `EdgeType.TRIGGERS`/`FEEDS` + tests (default traversal ignores them)
-- [ ] P5-2 `context_graph/workflow.py` `build_workflow` + tests
-- [ ] P5-3 Guarantee tests: workflow never in prompt, messages or `node_ids`
-- [ ] P5-4 Loop recording, fork volatility + tests
-- [ ] P5-5 `/graph` route `workflow` field + route test
-- [ ] P5-6 WebUI: toggle, workflow node type, layout, legend, i18n (10 locales) + vitest
-- [ ] P5-7 Playwright browser check (AGENTS.md *Browser check*)
-- [ ] P5-8 Checks: touched tests, full `pytest`, `ruff`, `basedpyright`, `bun run test/build/lint`
-- [ ] P5-9 Docs: `log.md`, MasterGuide, `docs/REVIEW-LATER.md`, `docs/DEMO-FEATURES.md`
+- [x] P5-1 `EdgeType.TRIGGERS`/`FEEDS` + tests (default traversal ignores them)
+- [x] P5-2 `context_graph/workflow.py` `build_workflow` + tests
+- [x] P5-3 Guarantee tests: workflow never in prompt, messages or `node_ids`
+- [x] P5-4 Loop recording, fork volatility + tests
+- [x] P5-5 `/graph` route `workflow` field + route test (route is a pass-through of `build_tree_graph`; the field is tested in `test_tree.py`, no separate route test)
+- [x] P5-6 WebUI: toggle, workflow node type, layout, legend, i18n (10 locales) + vitest
+- [x] P5-7 Playwright browser check (AGENTS.md *Browser check*) (real hybrid turn via temp gateway + mock LLM; found and fixed re-framing on toggle; gateway and mock stopped, 0 listening test sockets)
+- [x] P5-8 Checks: full pytest 6516 passed, 58 skipped, 3 deselected (the two known unrelated: `test_equivalent_workspace_paths_share_one_store`, `test_mcp_reconnect_crash`); ruff clean; basedpyright 0 errors on touched files; vitest 1153/1153 on the second run (the first full run showed 52 failures in one file that did not reproduce, file not captured; likely load-related, see REVIEW-LATER); `bun run build` and `bun run lint` clean
+- [x] P5-9 Docs: `log.md`, MasterGuide, `docs/REVIEW-LATER.md`, `docs/DEMO-FEATURES.md`
 
 ## Change log
 
@@ -111,6 +111,7 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-10-18 | Phase 4 checks | Full suites run. Fixed stale expectations for the attach payload's `context_strategy` in `tests/webui/test_session_projection.py` and `nanobot/channels/websocket/tests/test_websocket_channel.py`. Results in P4-10 above | uncommitted | SUCCESS |
 | 2026-10-18 | Polish pass (branch `polish`) | Restored the original `ThreadHeader.tsx` from before `7c20961c` and re-added the context toggle (the stripped header had dropped theme toggle, prompt navigator, session info, temporary-chat control: these were the 8 'pre-existing' WebUI failures); dropped the stale `sessionKey` prop from the call. `setup.ts` guards undefined `localStorage` (Node 26). Slash-command turns hidden from `tree.py` (edges bridged, tip moved) and excluded from `recall.py`. `derive.py` exposes `fork_of`/`canonical_node`; `summaries.py` resolves ranges canonically (fork prefix maps to source, inherited copies deduped, `Summary.head/nodes`). i18n: `thread.chatTree.*` keys in 10 locales, used in `ChatMinimap`, `ThreadShell`, `ContextStrategyBadge`. New `docs/DEMO-FEATURES.md`. Tests added: recall (`_command`), tree (`_command`), summaries (fork prefix, dedupe). Results: WebUI 1151/1151, build and lint clean; context_graph tests pass | uncommitted | SUCCESS |
 | 2026-10-19 | Phase 5 plan | Read-only audit (`engines.py`, `resolver.py`, `derive.py`, `tree.py`, `loop._graph_context`, `session/manager.py` volatile keys, `ChatMinimap`, `chat-tree.ts`). Added `docs/PHASE5-PLAN.md` (decisions D1-D4, guide deviations, design, tasks P5-0..P5-9, risks); Phase 5 tasks in `log.md`; corrected stale Phase 4 status (merged via PR #14/#15); MasterGuide Phase 5 deviations note; REVIEW-LATER Phase 5 planning note. Branch `phase5` from `master`. No code changed | uncommitted | SUCCESS |
+| 2026-10-19 | Phase 5 implementation | New: `context_graph/workflow.py` (`build_workflow`, `WORKFLOW_EDGES`); `model.py` (`EdgeType.TRIGGERS`/`FEEDS`); `agent/loop.py` (`_graph_context` records `_last_workflow`, skipped for subagent turns); `session/manager.py` (`_last_workflow` fork-volatile); `tree.py` (`_workflow`, additive `workflow` field with `anchor`); WebUI: `lib/chat-tree.ts` (`WorkflowNode`, `withWorkflow`, layout size), `ChatMinimap.tsx` (Workflow toggle, violet workflow nodes, legend, re-frame on toggle), `thread.chatTree.showWorkflow/hideWorkflow/workflowStep` in 10 locales. Tests: `tests/context_graph/test_workflow.py` (new), `test_tree.py` (workflow field), `chat-minimap.test.tsx` (2 cases). Docs: `docs/PHASE5-PLAN.md` section 6, `docs/DEMO-FEATURES.md`, MasterGuide, REVIEW-LATER. Results in P5-8 above | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`

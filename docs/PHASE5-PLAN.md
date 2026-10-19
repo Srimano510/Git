@@ -1,6 +1,6 @@
 # Phase 5 plan: workflow DAG (operation nodes)
 
-Status: **PLANNED 2026-10-19, decisions D1-D4 recorded, waiting for owner approval to implement.** No code changed.
+Status: **IMPLEMENTED 2026-10-19 on branch `phase5`, uncommitted. P5-0 to P5-9 done; see log.md and section 6. Browser-checked end to end with a mock LLM.**
 Branch: `phase5` (from `master` after the Phase 4 and polish merges). Spec: [MasterGuide-v3.md](../MasterGuide-v3.md), "Phase 5" (optional phase; guide text is partly out of date, see section 2).
 Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Phase 5 only applies the same typed-edge idea to *how a turn's context was built*, as an observability record.
 
@@ -98,3 +98,12 @@ Files expected to change: new `context_graph/workflow.py`, `tests/context_graph/
 - **`GraphTraversal` ms is derived** (`retrieval_ms - embed_ms`), so it includes ranking and rendering time. Labelled "ms" only, not "traversal ms".
 - **Strict typing** on the new module (`basedpyright` strict) and the JSON-shaped metadata reads, as in `tree.py`.
 - **Machine-translated labels** again in 9 locales; same caveat as the polish pass.
+
+## 6. As built (differences and findings)
+
+- Built as planned: `context_graph/workflow.py` (`build_workflow`, `WORKFLOW_EDGES`), `EdgeType.TRIGGERS`/`FEEDS`, one line in `loop._graph_context`, `_last_workflow` in `_FORK_VOLATILE_METADATA_KEYS`, `tree.py::_workflow` (additive `workflow` field with `anchor`), minimap toggle and violet workflow nodes, `thread.chatTree.showWorkflow/hideWorkflow/workflowStep` in 10 locales.
+- **No separate route test:** the `/graph` HTTP route is a pass-through of `build_tree_graph`, whose `workflow` field is covered in `tests/context_graph/test_tree.py` (anchor, stale anchor after a later turn, hidden command turns, absent/garbage record).
+- **Guarantees proven in `tests/context_graph/test_workflow.py`:** default traversal ignores the new edges; hybrid trace has the parallel branch and topological order 0,{1,2},3,4,5; `build_context` output is identical with a `_last_workflow` present; subagent and linear turns record nothing; forks do not inherit it.
+- **Browser check:** a real hybrid turn through the temp gateway wrote the trace (`GraphTraversal` visited 14, returned 8, pruned 6; `SemanticSearch` candidates 6, hits 2; `PromptBuild` 124 tokens). The toggle drew six violet nodes under the user message, parallel branch visible; hiding removed them. Found and fixed: the view did not re-frame when the toggle changed (workflow nodes opened off-screen), so the focus now includes the workflow nodes and re-runs on toggle.
+- **`GraphTraversal` ms** (287 ms in the check) is `retrieval_ms - embed_ms`, so it includes loading the sessions the graph touches; do not read it as pure traversal time.
+- The browser console showed one `401` resource error on a fresh page load (before login, in the first script). Not investigated; no workflow request is involved (the graph request is made after login).

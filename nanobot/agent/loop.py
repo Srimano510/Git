@@ -56,6 +56,7 @@ from nanobot.bus.runtime_events import RuntimeEventBus
 from nanobot.command import CommandContext, CommandRouter, register_builtin_commands
 from nanobot.config.schema import AgentDefaults, ContextGraphConfig, ModelPresetConfig
 from nanobot.context_graph import ContextResult, GraphContextEngine
+from nanobot.context_graph.workflow import build_workflow
 from nanobot.llm_usage.context import source_from_request
 from nanobot.providers.base import LLMProvider, LLMUsage, ProviderConversationState
 from nanobot.providers.factory import ProviderSnapshot
@@ -756,6 +757,8 @@ class AgentLoop:
             pool=session.metadata.get("context_pool"),
         )
         session.metadata["_last_context"] = {"strategy": result.strategy, "nodes": result.kinds()}
+        if query is not None:  # subagent turns have no user message to anchor the trace to
+            session.metadata["_last_workflow"] = build_workflow(result, len(session.messages))
         return result
 
     def _build_transcript_input(self, ctx: TurnContext) -> TranscriptInput:

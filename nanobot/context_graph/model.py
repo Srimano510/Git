@@ -18,6 +18,8 @@ class EdgeType(str, Enum):
     CONTEXT = "CONTEXT"
     REFERENCE = "REFERENCE"
     SUMMARY = "SUMMARY"
+    TRIGGERS = "TRIGGERS"  # workflow only: a step starts another
+    FEEDS = "FEEDS"  # workflow only: a step's output is another step's input
 
 
 @dataclass(frozen=True)

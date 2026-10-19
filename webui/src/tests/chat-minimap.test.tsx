@@ -54,6 +54,43 @@ describe("ChatMinimap", () => {
     expect(onSelectNode).toHaveBeenLastCalledWith(expect.objectContaining({ id: id(6) }), true);
   });
 
+  it("draws the last turn's workflow only while the Workflow toggle is on", async () => {
+    const payload: TreePayload = {
+      ...chain(2),
+      workflow: {
+        anchor: id(0),
+        nodes: [
+          { id: "workflow#0", label: "ContextStrategySelection", type: "intent", detail: "graph" },
+          { id: "workflow#1", label: "GraphTraversal", type: "tool", detail: "visited 2", ms: 1.5 },
+        ],
+        edges: [
+          { source: id(0), target: "workflow#0", type: "TRIGGERS" },
+          { source: "workflow#0", target: "workflow#1", type: "TRIGGERS" },
+        ],
+      },
+    };
+    stubGraph(payload);
+    render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
+
+    const toggle = await screen.findByRole("button", { name: "Show workflow" });
+    expect(screen.queryAllByTestId("minimap-workflow")).toHaveLength(0);
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getAllByTestId("minimap-workflow")).toHaveLength(2));
+    expect(screen.getByText("GraphTraversal")).toBeInTheDocument();
+    expect(screen.getByText(/1\.5 ms/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide workflow" }));
+    await waitFor(() => expect(screen.queryAllByTestId("minimap-workflow")).toHaveLength(0));
+  });
+
+  it("offers no Workflow toggle when the last turn left no trace", async () => {
+    stubGraph(chain(2));
+    render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
+    await screen.findAllByTestId("minimap-node");
+    expect(screen.queryByRole("button", { name: /workflow/i })).toBeNull();
+  });
+
   it("shows an error when the graph cannot be loaded", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => "" })));
     render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
