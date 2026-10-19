@@ -1205,6 +1205,10 @@ Prefer local/simple dependencies for the experiment. Do not add a production dat
 **[DO THIS]**: (Optional) Extend the graph to include workflow/execution nodes. Define node types for intent analysis, searches, merging, prompt construction, LLM invocation, etc. Link them with dependency edges. Ensure that the context-building logic skips these non-conversation nodes when assembling user prompt. Prepare one example workflow in the graph to illustrate the flow (no actual search needed).
 ```
 
+### Phase 5 owner decisions and deviations (2026-10-19)
+
+**Status: planned, awaiting owner approval to implement.** Full plan: [docs/PHASE5-PLAN.md](docs/PHASE5-PLAN.md). Because Phase 3 removed the stored graph and `ChatNode`, this phase deviates from the text above: the workflow is a **real trace derived from each graph/hybrid turn's `ContextResult`** (not a simulated sample), built as a small `ConversationGraph` of `("workflow", i)` addresses with two new edge types `TRIGGERS` and `FEEDS` (`INTENT` dropped), kept in `session.metadata["_last_workflow"]` (last turn only, dropped on fork) and never in `Session.messages`. The flow is the trimmed repo flow: strategy selection, graph traversal and semantic search in parallel, merge, prompt build, LLM call. The context engine ignores it by construction (`TRAVERSE_EDGE_TYPES` does not include the new types). It is drawn inside the existing minimap behind a "Workflow" toggle; no new timing is added to the agent loop, so `PromptBuild` and `LLMCall` have no duration. Phase 6 replaces the minimap view with the Observatory.
+
 ### Repository-specific implementation notes for Phase 5
 
 Workflow DAG nodes are optional and should not be inserted into `Session.messages`.
