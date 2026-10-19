@@ -1,6 +1,6 @@
 # Phases 7 to 11 plan: from "more complete" to "complete AND selective", plus a demo kit
 
-Status: **Phases 7, 8 and 9 IMPLEMENTED 2026-10-19 (as-built notes in sections 10 to 12); Phases 10 and 11 planned, waiting for approval.**
+Status: **Phases 7 to 10 IMPLEMENTED 2026-10-19 (as-built notes in sections 10 to 13); Phase 11 planned, waiting for approval.**
 Branch for planning: `phase7`. Each phase gets its own branch (`phase7` ... `phase11`) and its own commit(s) by the owner. Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Everything below either *proves* the claim, *removes a known gap*, or *makes the demo safe*.
 
 ## 1. Project goals (owner answers, 2026-10-19)
@@ -267,3 +267,22 @@ The claim holds at every budget from 150 up with both embedders. At 100 tokens, 
 - The recording stores up to 120 excerpts of 120 characters (about 30 KB at most) in the session file, replaced every turn. Excerpts are the same sanitised public text the route already served.
 - Turns recorded before this phase, or with the flag off, still show the rebuilt (drift-prone) comparison, and the label says so.
 - Timings of the two strategies that were *not* used are measured at turn time but are not the cost of a real turn.
+
+## 13. Phase 10 as built (differences and findings)
+
+**Built as planned:** `/context summarize <from> <to>` (`command/builtin.py::_context_summarize`), `context_graph/summarize.py` (`generate_summary`, `transcript_for`, `SummaryError`), summaries store extended additively (`source: "llm"` only on generated records, `check_range`, `all_summaries`; old records and unknown `source` values load as manual), engine labels (`summary (generated, covers a-b)`, `[generated summary of messages a-b]`), `/context summary` lists generated ones as `(generated)`, config `summaryMaxMessages` (80) and `summaryMaxTokens` (300), and a "N summaries used" line on the hybrid card (10 locales). Validation happens before any model call (usage, range, size cap); a failed, empty or raising call stores nothing and replies with the reason.
+
+**Differences from the plan**
+- **Not the Memory summarizer.** The audit found that `MemoryStore.summarize_transcript` goes through the archiver, which **writes into the durable memory journal** and raw-dumps the messages there on failure. A demo summary must not feed Dream's memory, so `/context summarize` makes its own single tool-free `provider.chat_with_retry` call (the WebUI title generator's pattern, usage source `system`). The transcript is sent as data: the system prompt says not to follow instructions inside it, tool output and slash-command turns are left out, and each message is truncated.
+- **Summaries had to become the first thing pruning drops (not planned, found in the browser).** With Phase 7's budget, pruning fills spare budget with the next-best older turns, so it kept the first and last small-talk turns inside the summarized range; the Phase 4 rule "a summary is used only when every covered message was dropped" then left the summary silently unused. In `hybrid` mode the engine now tells the pruner which turns a stored summary covers, and turns *fully* covered are dropped before ranking (recent turns and partly covered turns are unaffected; in `graph` mode summaries are never shown, so nothing changes). Tests: pure (covered turns dropped, relevant turn still wins, recent and partly covered protected) and engine (hybrid uses the summary, graph keeps competing).
+
+**Latent bug found by the same browser run and fixed (Phase 7 code, regression tests added):** with `semanticEmbedder: "model2vec"` (explicit), `snapshot_download(local_files_only=False)` contacts huggingface.co **on every process start**, even for a cached model, and that call stalled here, freezing the first turn. The loader now tries the local cache first and goes online only when the model is not cached and downloads are allowed (`auto` never goes online).
+
+**Verified:** `test_summarize.py` (prompt and call shape, data-not-instructions, role lines, commands/tool output/hidden skipped, truncation, error/empty/raising calls, token cap, nothing-to-summarise never calls the model), summaries tests (source field, old records, unknown values ignored, labels in reasons and the recalled block, `kinds()` still "summary"), command tests (store + list + persisted, bad ranges refused with no call, size cap, failure stores nothing, command-only range, help), prune and engine tests above, loader tests (cached model: one local lookup and no network; missing: local then one download only when allowed; not allowed: never online). **Browser (temp gateway, real model2vec, mock LLM):** bad range refused; `/context summarize 4 25` sent 22 messages in one tool-free call and stored a generated summary; `/context summary` listed it as `(generated)`; the next live turn's request carried `[generated summary of messages 4-25]` plus both facts and none of the small talk; the hybrid card read "1 summaries used" and the matrix row `hybrid: summary (generated, covers 4-25)`.
+
+**Limits (honest)**
+- The mock LLM returns one canned answer, so the *content* of a summary was not judged here; real quality depends on the model (the free Zen model in the demo). Summaries are labelled generated and never replace the raw messages.
+- A summary only matters when the history is over `graphTokenBudget`; below the budget everything is replayed and summaries are not shown.
+- Generation costs one model call per command and blocks that command until it returns (no progress indicator); the command has no timeout of its own beyond the provider's retries.
+- A summary stands in for turns it *fully* covers. A range that cuts through a turn leaves that turn competing normally.
+- Automatic summaries on compaction were deliberately not built.

@@ -21,7 +21,7 @@ const payload: ObservatoryPayload = {
     },
     hybrid: {
       nodes: 3, tokens: 55, ms: 3.1, fallback: "RuntimeError: boom",
-      timing: timing(1.6, 1.5), recalled: 1, summaries: 0,
+      timing: timing(1.6, 1.5), recalled: 1, summaries: 2,
     },
   },
   nodes: [
@@ -77,6 +77,8 @@ describe("ContextObservatory", () => {
     expect(hybrid).toHaveTextContent("3.1 ms");
     expect(hybrid).toHaveTextContent("used for this turn");
     expect(hybrid).toHaveTextContent("RuntimeError: boom");
+    expect(hybrid).toHaveTextContent("2 summaries used");
+    expect(screen.getByTestId("observatory-card-graph")).not.toHaveTextContent("summaries used");
     expect(screen.getByTestId("observatory-card-graph")).not.toHaveTextContent("used for this turn");
     const graph = screen.getByTestId("observatory-card-graph");
     expect(graph).toHaveTextContent("5 pruned by relevance");

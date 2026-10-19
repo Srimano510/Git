@@ -12,6 +12,7 @@ from .derive import canonical_node
 from .model import NodeId
 
 SUMMARIES_KEY = "context_summaries"
+GENERATED = "llm"  # the ``source`` of a model-written summary; manual ones carry no field
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class Summary:
     text: str
     head: NodeId  # first covered ancestry node (canonical: a fork's prefix maps to its source)
     nodes: frozenset[NodeId]  # covered ancestry nodes (canonical)
+    source: str = "manual"  # "llm" when a model wrote it
 
 
 def list_summaries(session: Session) -> list[dict[str, Any]]:
@@ -39,18 +41,29 @@ def list_summaries(session: Session) -> list[dict[str, Any]]:
             and isinstance(text, str)
             and text
         ):
-            out.append({"from": start, "to": end, "text": text})
+            record: dict[str, Any] = {"from": start, "to": end, "text": text}
+            if d.get("source") == GENERATED:  # unknown values are ignored
+                record["source"] = GENERATED
+            out.append(record)
     return out
 
 
-def add_summary(session: Session, start: int, end: int, text: str) -> None:
+def check_range(session: Session, start: int, end: int) -> None:
+    """Raise ``ValueError`` unless ``start..end`` (inclusive) is a range of this session."""
+    if not 0 <= start <= end < len(session.messages):
+        raise ValueError(f"range {start}-{end} is outside 0-{len(session.messages) - 1}")
+
+
+def add_summary(session: Session, start: int, end: int, text: str, source: str = "manual") -> None:
     """Summarise messages ``start..end`` (inclusive, indices into this session)."""
     text = text.strip()
     if not text:
         raise ValueError("summary text is empty")
-    if not 0 <= start <= end < len(session.messages):
-        raise ValueError(f"range {start}-{end} is outside 0-{len(session.messages) - 1}")
-    session.metadata[SUMMARIES_KEY] = [*list_summaries(session), {"from": start, "to": end, "text": text}]
+    check_range(session, start, end)
+    record: dict[str, Any] = {"from": start, "to": end, "text": text}
+    if source == GENERATED:
+        record["source"] = GENERATED
+    session.metadata[SUMMARIES_KEY] = [*list_summaries(session), record]
 
 
 def clear_summaries(session: Session) -> int:
@@ -62,7 +75,12 @@ def clear_summaries(session: Session) -> int:
 def usable_summaries(
     sessions: Mapping[str, Session], ancestry: Sequence[NodeId], kept: set[NodeId]
 ) -> list[Summary]:
-    """Summaries that stand in for ancestry nodes: every covered node was dropped from replay.
+    """Summaries that stand in for ancestry nodes: every covered node was dropped from replay."""
+    return [u for u in all_summaries(sessions, ancestry) if not u.nodes & kept]
+
+
+def all_summaries(sessions: Mapping[str, Session], ancestry: Sequence[NodeId]) -> list[Summary]:
+    """Every stored summary that covers part of ``ancestry``, whether or not its range was dropped.
 
     Ranges are resolved to canonical nodes, so a summary written on a fork over its copied
     prefix matches the source's nodes, and a fork's inherited copy of a summary is not
@@ -81,7 +99,9 @@ def usable_summaries(
             except KeyError:  # fork source not loaded: treat the range as this session's own
                 nodes = frozenset((key, i) for i in range(d["from"], d["to"] + 1))
             covered = nodes & in_ancestry
-            if covered and not covered & kept and (d["text"], nodes) not in seen:
+            if covered and (d["text"], nodes) not in seen:
                 seen.add((d["text"], nodes))
-                out.append(Summary(key, d["from"], d["to"], d["text"], min(covered), covered))
+                out.append(
+                    Summary(key, d["from"], d["to"], d["text"], min(covered), covered, d.get("source", "manual"))
+                )
     return sorted(out, key=lambda u: u.head)

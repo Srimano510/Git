@@ -70,3 +70,12 @@ def test_model_validate_works_when_context_graph_was_imported_before_the_schema(
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr[-400:]
     assert done.stdout.strip() == "auto"
+
+
+def test_summary_limits_have_defaults_and_aliases():
+    cg = Config.model_validate({"agents": {"defaults": {"model": "x"}}}).context_graph
+    assert (cg.summary_max_messages, cg.summary_max_tokens) == (80, 300)
+    loaded = Config.model_validate({"contextGraph": {"summaryMaxMessages": 10, "summaryMaxTokens": 120}}).context_graph
+    assert (loaded.summary_max_messages, loaded.summary_max_tokens) == (10, 120)
+    with pytest.raises(ValidationError):
+        ContextGraphConfig(summary_max_messages=0)

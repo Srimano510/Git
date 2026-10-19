@@ -1410,6 +1410,7 @@
       "tokens": "{{count}} 個 token",
       "ms": "{{value}} 毫秒",
       "recalled": "召回 {{count}} 則",
+      "summariesUsed": "使用了 {{count}} 則摘要",
       "pruned": "依相關性剔除 {{count}} 則",
       "embedder": "嵌入器：{{name}}",
       "onlyIn": "僅此處 {{count}} 則",

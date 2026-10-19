@@ -153,6 +153,11 @@ export default function ContextObservatory({
                         {t("thread.observatory.recalled", { count: info.recalled })}
                       </div>
                     ) : null}
+                    {s === "hybrid" && info.summaries ? (
+                      <div className="text-muted-foreground">
+                        {t("thread.observatory.summariesUsed", { count: info.summaries })}
+                      </div>
+                    ) : null}
                     <div className="text-muted-foreground">
                       {t("thread.observatory.onlyIn", { count: data.only[s] })}
                     </div>

@@ -162,3 +162,52 @@ def test_an_embedder_failure_skips_pruning_but_not_the_turn():
     assert result.diagnostics["fallback"] is None
     assert result.diagnostics["prune_error"] == "RuntimeError: boom"
     assert result.messages  # the turn still gets (budget-trimmed) history
+
+
+def test_a_generated_summary_stands_in_for_a_pruned_range_too():
+    msgs = chat(n_noise_before=6, n_noise_after=3)
+    s = session_of(msgs)
+    add_summary(s, 0, 11, "Early small talk about fruit, condensed by the model.", source="llm")
+    out = engine(graph_token_budget=tokens(msgs) // 3).build_context(s, query=QUERY, hybrid=True)
+    assert "[generated summary of messages 0-11] Early small talk about fruit" in out.recalled
+    assert out.reasons["s#0"] == "summary (generated, covers 0-11)"
+
+
+# --- a summary makes the turns it covers the first to go ------------------------------------
+
+
+def test_turns_fully_covered_by_a_summary_are_dropped_before_ranking():
+    msgs = chat()
+    covered = set(range(0, 10))  # the five noise turns before the relevant one
+    plain = prune_by_relevance(msgs, QUERY, HashEmbedder(), budget=tokens(msgs) * 2 // 3, keep_recent_turns=2)
+    with_summary = prune_by_relevance(
+        msgs, QUERY, HashEmbedder(), budget=tokens(msgs) * 2 // 3, keep_recent_turns=2, covered=covered
+    )
+    assert plain is not None and with_summary is not None
+    assert set(plain.kept) & covered  # the spare budget keeps some of that small talk...
+    assert not set(with_summary.kept) & covered  # ...but not once a summary stands in for it
+    assert {10, 11} <= set(with_summary.kept)  # the relevant turn still wins on merit
+
+
+def test_covered_recent_turns_and_partly_covered_turns_are_not_dropped_by_that_rule():
+    msgs = chat()
+    last = len(msgs) - 1
+    result = prune_by_relevance(
+        msgs, QUERY, HashEmbedder(), budget=tokens(msgs) // 2, keep_recent_turns=2,
+        covered={last, last - 1, 0},  # a recent turn, and only the first half of turn 0
+    )
+    assert result is not None and {last - 1, last} <= set(result.kept)  # recent turns are protected
+    assert split_turns(msgs)[0] == [0, 1]  # message 1 of that turn is not covered, so it still competes
+
+
+def test_hybrid_uses_a_summary_over_a_range_that_pruning_would_only_partly_drop():
+    msgs = chat(n_noise_before=8, n_noise_after=3)
+    s = session_of(msgs)
+    add_summary(s, 0, 15, "The model's gist of the early small talk.", source="llm")  # all 8 noise turns
+    budget = tokens(msgs) * 2 // 3
+    out = engine(graph_token_budget=budget).build_context(s, query=QUERY, hybrid=True)
+    assert "[generated summary of messages 0-15] The model's gist" in out.recalled
+    assert not any(int(n.split("#")[1]) < 16 for n in out.node_ids if not out.reasons[n].startswith("summary"))
+    # graph mode never shows summaries, so the covered turns keep competing for the budget there
+    graph = engine(graph_token_budget=budget).build_context(s, query=QUERY)
+    assert any(int(n.split("#")[1]) < 16 for n in graph.node_ids)

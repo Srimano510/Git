@@ -1410,6 +1410,7 @@
       "tokens": "{{count}} tokens",
       "ms": "{{value}} ms",
       "recalled": "{{count}} rappelés",
+      "summariesUsed": "{{count}} résumés utilisés",
       "pruned": "{{count}} écartés par pertinence",
       "embedder": "Plongement : {{name}}",
       "onlyIn": "{{count}} uniquement ici",

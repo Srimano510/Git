@@ -8,7 +8,7 @@ older turns compete for the remaining budget by similarity to the current messag
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -52,12 +52,14 @@ def prune_by_relevance(
     *,
     budget: int,
     keep_recent_turns: int,
+    covered: Collection[int] = frozenset(),
 ) -> Pruned | None:
     """The messages to keep, or ``None`` when everything already fits ``budget`` tokens.
 
     The last ``keep_recent_turns`` turns are always kept (even if they alone exceed the
     budget). Older turns are ranked by cosine similarity to ``query`` (newest first on ties)
-    and added while they fit.
+    and added while they fit. Older turns whose messages are all in ``covered`` (indices a
+    summary stands in for) are dropped before ranking.
     """
     cost = [estimate_message_tokens(dict(m)) for m in messages]
     if sum(cost) <= budget:
@@ -69,7 +71,11 @@ def prune_by_relevance(
 
     q = embedder.embed(query) if query.strip() else {}
     ranked = sorted(
-        ((cosine(q, embedder.embed(_turn_text(messages, t))) if q else 0.0, n) for n, t in enumerate(older)),
+        (
+            (cosine(q, embedder.embed(_turn_text(messages, t))) if q else 0.0, n)
+            for n, t in enumerate(older)
+            if not all(i in covered for i in t)
+        ),
         key=lambda x: (-x[0], -x[1]),
     )
     chosen: dict[int, float] = {}

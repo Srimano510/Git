@@ -1410,6 +1410,7 @@
       "tokens": "{{count}} token",
       "ms": "{{value}} md",
       "recalled": "{{count}} dipanggil kembali",
+      "summariesUsed": "{{count}} ringkasan dipakai",
       "pruned": "{{count}} dipangkas karena relevansi",
       "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} hanya di sini",

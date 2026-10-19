@@ -103,7 +103,7 @@ BUILTIN_COMMAND_SPECS: tuple[BuiltinCommandSpec, ...] = (
         "Switch context strategy",
         "Show or switch the context strategy (linear, graph or hybrid); link chats with link/links/unlink.",
         "history",
-        "[strategy|link|links|unlink]",
+        "[strategy|summary|summarize|link|links|unlink]",
         accepts_args=True,
     ),
     BuiltinCommandSpec(
@@ -451,7 +451,7 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
             "- Available strategies: `linear`, `graph`, `hybrid`\n"
             f"- Links: {len(list_links(session))}\n"
             "- Switch with `/context <strategy>`; `/context hybrid archived|family|default`; "
-            "`/context summary <from> <to> <text>`; "
+            "`/context summary <from> <to> <text>`, `/context summarize <from> <to>` (model-written); "
             "`/context link <chat key>#<n> [<m>]`, `/context links`, `/context unlink <n>`"
         )
 
@@ -459,7 +459,10 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
         if not rest:
             found = list_summaries(session)
             return reply(
-                "\n".join(f"- {d['from']}-{d['to']}: {d['text']}" for d in found)
+                "\n".join(
+                    f"- {d['from']}-{d['to']}{' (generated)' if d.get('source') else ''}: {d['text']}"
+                    for d in found
+                )
                 or "No summaries. Use `/context summary <from> <to> <text>`."
             )
         if rest.lower() == "clear":
@@ -473,6 +476,9 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
             return reply(f"Could not save summary: {exc}. Usage: `/context summary <from> <to> <text>`")
         loop.sessions.save(session)
         return reply(f"Saved summary for messages {start}-{end}.")
+
+    if head == "summarize":
+        return reply(await _context_summarize(ctx, session, rest))
 
     if head in {"link", "links", "unlink"}:
         return reply(_context_links(loop, session, head, rest))
@@ -494,6 +500,39 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
     return reply(
         f"Unknown context strategy: `{raw_args}`. Available strategies: `linear`, `graph`, `hybrid`."
     )
+
+
+async def _context_summarize(ctx: CommandContext, session: Session, rest: str) -> str:
+    """``/context summarize <from> <to>``: a model-written summary of a message range."""
+    from nanobot.context_graph.summaries import GENERATED, add_summary, check_range
+    from nanobot.context_graph.summarize import SummaryError, generate_summary
+
+    loop = ctx.loop
+    usage = "Usage: `/context summarize <from> <to>` (message numbers of this chat; the model writes the summary)"
+    parts = rest.split()
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        return usage
+    start, end = int(parts[0]), int(parts[1])
+    try:
+        check_range(session, start, end)  # refuse before spending a model call
+    except ValueError as exc:
+        return f"Could not summarize: {exc}. {usage}"
+    cfg = loop.context_graph_config
+    if end - start + 1 > cfg.summary_max_messages:
+        return (
+            f"Could not summarize: that range has {end - start + 1} messages; "
+            f"at most {cfg.summary_max_messages} are sent to the model."
+        )
+    runtime = ctx.runtime or loop.runtime_for_session(session)
+    try:
+        text = await generate_summary(
+            runtime.provider, runtime.model, session.messages[start : end + 1], max_tokens=cfg.summary_max_tokens
+        )
+        add_summary(session, start, end, text, source=GENERATED)
+    except (SummaryError, ValueError) as exc:
+        return f"Could not generate a summary: {exc}."
+    loop.sessions.save(session)
+    return f"Saved generated summary for messages {start}-{end}: {text}"
 
 
 def _context_links(loop: AgentLoop, session: Session, head: str, rest: str) -> str:

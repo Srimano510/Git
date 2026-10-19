@@ -16,7 +16,7 @@ from .observability import ContextResult
 from .prune import prune_by_relevance
 from .recall import pool_candidates, recall
 from .resolver import get_ancestor_context
-from .summaries import usable_summaries
+from .summaries import all_summaries, usable_summaries
 from .tree import load_family, message_text
 
 if TYPE_CHECKING:
@@ -95,12 +95,17 @@ class GraphContextEngine:
             ]
             if budget > 0 and replayable:
                 try:
+                    # In hybrid mode a stored summary stands in for the turns it covers, so those go first.
+                    standing_in: set[NodeId] = (
+                        {n for u in all_summaries(sessions, nodes) for n in u.nodes} if hybrid else set()
+                    )
                     pruned = prune_by_relevance(
                         [sessions[k].messages[i] for k, i in replayable],
                         query or "",
                         self.embedder,
                         budget=history_args["max_tokens"],
                         keep_recent_turns=self.config.keep_recent_turns,
+                        covered={j for j, node in enumerate(replayable) if node in standing_in},
                     )
                     if pruned is not None:
                         relevance = {replayable[j]: s for j, s in pruned.scores.items()}
@@ -206,10 +211,11 @@ class GraphContextEngine:
 
             lines: list[tuple[str, str, str]] = []  # (node id, reason, rendered line)
             for u in summaries:
+                generated = u.source == "llm"
                 lines.append((
                     f"{u.head[0]}#{u.head[1]}",
-                    f"summary (covers {u.start}-{u.end})",
-                    f"[summary of messages {u.start}-{u.end}] {u.text}",
+                    f"summary ({'generated, ' if generated else ''}covers {u.start}-{u.end})",
+                    f"[{'generated ' if generated else ''}summary of messages {u.start}-{u.end}] {u.text}",
                 ))
             for h in hits:
                 role = known[h.node[0]].messages[h.node[1]].get("role")

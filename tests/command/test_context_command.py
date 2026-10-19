@@ -120,3 +120,95 @@ async def test_bad_links_explain_themselves_and_change_nothing(tmp_path):
 @pytest.mark.asyncio
 async def test_context_help_mentions_the_link_commands(tmp_path):
     assert "/context link" in await run(_loop(tmp_path), "")
+
+
+# --- /context summarize (Phase 10) -------------------------------------------------------------
+
+from types import SimpleNamespace  # noqa: E402
+from unittest.mock import AsyncMock  # noqa: E402
+
+
+def with_model_reply(loop, content="The team picked Postgres.", finish_reason="stop"):
+    loop.provider.chat_with_retry = AsyncMock(return_value=SimpleNamespace(content=content, finish_reason=finish_reason))
+    return loop.provider.chat_with_retry
+
+
+def chat_of(loop, n=6):
+    s = session(loop)
+    for i in range(n):
+        s.add_message("user" if i % 2 == 0 else "assistant", f"message {i} about the orders database")
+    loop.sessions.save(s)
+    return s
+
+
+@pytest.mark.asyncio
+async def test_summarize_stores_a_generated_summary_and_lists_it_as_generated(tmp_path):
+    loop = _loop(tmp_path)
+    chat_of(loop)
+    call = with_model_reply(loop)
+    reply = await run(loop, "summarize 0 3")
+    assert "Saved generated summary for messages 0-3" in reply and "The team picked Postgres." in reply
+    call.assert_awaited_once()
+    stored = list_summaries(session(loop))
+    assert stored == [{"from": 0, "to": 3, "text": "The team picked Postgres.", "source": "llm"}]
+    assert loop.sessions.read_session_snapshot("cli:c").metadata["context_summaries"]  # saved
+    listing = await run(loop, "summary")
+    assert "0-3" in listing and "generated" in listing and "The team picked Postgres." in listing
+
+
+@pytest.mark.asyncio
+async def test_bad_ranges_are_refused_before_any_model_call(tmp_path):
+    loop = _loop(tmp_path)
+    chat_of(loop)
+    call = with_model_reply(loop)
+    for args, needle in [
+        ("summarize", "Usage: `/context summarize"),
+        ("summarize 0", "Usage: `/context summarize"),
+        ("summarize a b", "Usage: `/context summarize"),
+        ("summarize 3 1", "outside"),
+        ("summarize 0 99", "outside"),
+    ]:
+        assert needle in await run(loop, args), args
+    call.assert_not_awaited()
+    assert list_summaries(session(loop)) == []
+
+
+@pytest.mark.asyncio
+async def test_a_range_over_the_configured_cap_is_refused(tmp_path):
+    from nanobot.config.schema import ContextGraphConfig
+
+    loop = _loop(tmp_path)
+    loop.context_graph_config = ContextGraphConfig(summary_max_messages=3)
+    chat_of(loop)
+    call = with_model_reply(loop)
+    assert "at most 3" in await run(loop, "summarize 0 4")
+    call.assert_not_awaited()
+    assert "Saved generated summary" in await run(loop, "summarize 0 2")
+
+
+@pytest.mark.asyncio
+async def test_a_failed_model_call_stores_nothing(tmp_path):
+    loop = _loop(tmp_path)
+    chat_of(loop)
+    with_model_reply(loop, content="Error calling LLM: rate limited", finish_reason="error")
+    reply = await run(loop, "summarize 0 3")
+    assert "Could not generate a summary" in reply and "rate limited" in reply
+    assert list_summaries(session(loop)) == []
+
+
+@pytest.mark.asyncio
+async def test_a_range_of_only_command_turns_has_nothing_to_summarise(tmp_path):
+    loop = _loop(tmp_path)
+    s = session(loop)
+    s.add_message("user", "hi")
+    s.add_message("user", "/context graph", _command=True)
+    s.add_message("assistant", "Switched.", _command=True)
+    loop.sessions.save(s)
+    call = with_model_reply(loop)
+    assert "nothing to summarise" in await run(loop, "summarize 1 2")
+    call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_help_mentions_summarize(tmp_path):
+    assert "/context summarize" in await run(_loop(tmp_path), "")

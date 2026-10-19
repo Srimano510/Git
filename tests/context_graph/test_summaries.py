@@ -90,3 +90,42 @@ def test_inherited_copy_of_a_summary_is_not_counted_twice(tmp_path):
 
     out = usable_summaries(sessions, ancestry, kept={("websocket:kid", i) for i in range(4, 8)})
     assert [u.text for u in out] == ["source summary"]
+
+
+# --- Phase 10: generated summaries -------------------------------------------------------
+
+
+def test_generated_summaries_are_marked_and_old_records_still_load():
+    from nanobot.context_graph.summaries import add_summary, list_summaries
+
+    s = Session(key="s")
+    for i in range(6):
+        s.add_message("user" if i % 2 == 0 else "assistant", f"m{i}")
+    s.metadata["context_summaries"] = [{"from": 0, "to": 1, "text": "old manual record"}]  # pre-Phase-10 shape
+    add_summary(s, 2, 3, "written by hand")
+    add_summary(s, 4, 5, "written by a model", source="llm")
+    found = list_summaries(s)
+    assert [d.get("source") for d in found] == [None, None, "llm"]  # only generated ones carry the field
+    s.metadata["context_summaries"][2]["source"] = "weird"
+    assert "source" not in list_summaries(s)[2]  # unknown values are ignored
+
+
+def test_a_generated_summary_is_labelled_in_the_reason_and_the_recalled_block():
+    from nanobot.config.schema import ContextGraphConfig
+    from nanobot.context_graph import GraphContextEngine
+    from nanobot.context_graph.summaries import add_summary
+
+    s = Session(key="s")
+    for i in range(14):
+        s.add_message("user" if i % 2 == 0 else "assistant", f"small talk about fruit number {i}")
+    add_summary(s, 0, 5, "Hand-written gist.")
+    add_summary(s, 6, 9, "Model-written gist.", source="llm")
+    s.last_archived = 10  # everything the summaries cover is out of the replay
+    out = GraphContextEngine(config=ContextGraphConfig(semantic_embedder="hash")).build_context(
+        s, hybrid=True, query="unrelated question about databases"
+    )
+    assert "[summary of messages 0-5] Hand-written gist." in out.recalled
+    assert "[generated summary of messages 6-9] Model-written gist." in out.recalled
+    assert out.reasons["s#0"] == "summary (covers 0-5)"
+    assert out.reasons["s#6"] == "summary (generated, covers 6-9)"
+    assert out.kinds()["s#6"] == "summary"
