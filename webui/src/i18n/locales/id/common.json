@@ -1403,6 +1403,8 @@
       "tokens": "{{count}} token",
       "ms": "{{value}} md",
       "recalled": "{{count}} dipanggil kembali",
+      "pruned": "{{count}} dipangkas karena relevansi",
+      "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} hanya di sini",
       "fallback": "Kembali ke: {{reason}}",
       "timing": "Waktu (diukur pada pembangunan ulang)",

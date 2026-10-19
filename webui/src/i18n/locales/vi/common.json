@@ -1403,6 +1403,8 @@
       "tokens": "{{count}} token",
       "ms": "{{value}} ms",
       "recalled": "{{count}} được gợi lại",
+      "pruned": "{{count}} bị loại theo độ liên quan",
+      "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} chỉ có ở đây",
       "fallback": "Dự phòng: {{reason}}",
       "timing": "Thời gian (đo khi dựng lại)",

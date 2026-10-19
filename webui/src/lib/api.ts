@@ -328,6 +328,9 @@ export interface ObservatoryStrategyInfo {
   timing: { traversal_ms: number; vector_ms: number; total_ms: number };
   recalled?: number;
   summaries?: number;
+  /** Graph/hybrid only: messages dropped by relevance pruning, and which embedder scored them. */
+  pruned?: number;
+  embedder?: string;
 }
 
 export interface ObservatoryNode {

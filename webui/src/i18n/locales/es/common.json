@@ -1404,6 +1404,8 @@
       "tokens": "{{count}} tokens",
       "ms": "{{value}} ms",
       "recalled": "{{count}} recuperados",
+      "pruned": "{{count}} descartados por relevancia",
+      "embedder": "Incrustador: {{name}}",
       "onlyIn": "{{count}} solo aquí",
       "fallback": "Recurrió a: {{reason}}",
       "timing": "Tiempos (medidos en la reconstrucción)",

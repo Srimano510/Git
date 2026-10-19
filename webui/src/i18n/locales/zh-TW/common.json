@@ -1403,6 +1403,8 @@
       "tokens": "{{count}} 個 token",
       "ms": "{{value}} 毫秒",
       "recalled": "召回 {{count}} 則",
+      "pruned": "依相關性剔除 {{count}} 則",
+      "embedder": "嵌入器：{{name}}",
       "onlyIn": "僅此處 {{count}} 則",
       "fallback": "已回退：{{reason}}",
       "timing": "耗時（於重建時量測）",

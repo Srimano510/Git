@@ -138,6 +138,16 @@ export default function ContextObservatory({
                         style={{ width: `${(info.tokens / maxTokens) * 100}%` }}
                       />
                     </div>
+                    {info.pruned ? (
+                      <div className="text-muted-foreground">
+                        {t("thread.observatory.pruned", { count: info.pruned })}
+                      </div>
+                    ) : null}
+                    {info.embedder ? (
+                      <div className="text-muted-foreground">
+                        {t("thread.observatory.embedder", { name: info.embedder })}
+                      </div>
+                    ) : null}
                     {s === "hybrid" && info.recalled !== undefined ? (
                       <div className="mt-1 text-muted-foreground">
                         {t("thread.observatory.recalled", { count: info.recalled })}

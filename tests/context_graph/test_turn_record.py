@@ -90,3 +90,18 @@ def test_turn_anchor_is_the_first_visible_user_message_at_or_after_at():
     assert turn_anchor(s, 2) == "s#3"
     assert turn_anchor(s, 0) == "s#0"
     assert turn_anchor(s, 99) is None
+
+
+def test_graph_budget_reaches_the_turn_and_the_recorded_config(tmp_path):
+    loop = make_loop(tmp_path, context_graph_config=ContextGraphConfig(
+        graph_token_budget=60, keep_recent_turns=1, semantic_embedder="hash"))
+    s = Session(key="cli:c")
+    s.metadata["context_strategy"] = "graph"
+    for i in range(8):
+        s.add_message("user", f"unrelated small talk number {i} about fruit and weather")
+        s.add_message("assistant", f"bananas are berries and tomatoes are fruit {i}")
+    history, result = loop._turn_history(s, "unrelated small talk", is_subagent=False)
+    assert result is not None and result.diagnostics["graph_budget"] == 60
+    assert result.diagnostics["pruned_by_relevance"] > 0 and len(history) < 16
+    recorded = s.metadata["_last_turn"]["graph_config"]
+    assert recorded["graph_token_budget"] == 60 and recorded["keep_recent_turns"] == 1

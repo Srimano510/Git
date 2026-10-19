@@ -1414,6 +1414,11 @@ Add tests for:
 - no regression in existing WebUI fork behavior.
 
 
+
+### Phases 7 to 11: beyond the guide (owner decisions, 2026-10-19)
+
+**Status: Phase 7 implemented 2026-10-19** (as-built notes and measurements in `docs/PHASES7-11-PLAN.md` section 10); Phases 8 to 11 planned. The guide ends at Phase 6. Measured in Phase 6, graph and hybrid are more complete than linear but not more selective, so the extra phases target the headline claim "complete AND selective" and a safe live demo. Full plan: [docs/PHASES7-11-PLAN.md](docs/PHASES7-11-PLAN.md). Phase 7: real local embedder (model2vec, optional extra, hashed fallback), a dedicated graph token budget and relevance-pruned replay, a noise demo with pass criteria fixed beforehand. Phase 8: `/context link|links|unlink`, a Tree "Link into this chat" action, one strategy toggle. Phase 9: record all three strategies at turn time behind a config flag so the Observatory is exact. Phase 10: `/context summarize` (LLM summaries on demand). Phase 11: mock-LLM fallback, preflight script, final seed scenarios, a root `demo.md` listing everything added, and the slide outline.
+
 ---
 
 ## Optional: Future Strategies & Presentation

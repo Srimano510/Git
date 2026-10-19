@@ -55,8 +55,19 @@ class ContextGraphConfig(Base):
 
     semantic_pool: Literal["archived", "family"] = "archived"  # where recall may look
     semantic_top_k: int = Field(default=3, ge=1)
-    semantic_min_score: float = Field(default=0.15, ge=0.0, le=1.0)
+    # Lowest similarity that counts as a match. Unset: the embedder's own default (hashed words 0.15,
+    # model2vec 0.30, because a dense model scores unrelated text higher).
+    semantic_min_score: float | None = Field(default=None, ge=0.0, le=1.0)
     recall_token_budget: int = Field(default=1500, ge=1)
+    # "hash" = shared-word matching (no dependency); "model2vec" = local semantic model from the
+    # optional `semantic` extra; "auto" = the model only if installed and already downloaded.
+    semantic_embedder: Literal["auto", "hash", "model2vec"] = "auto"
+    semantic_model: str = "minishlab/potion-base-8M"
+    # History budget for graph/hybrid (0 = the model's whole context window, as before). When the
+    # ancestry exceeds it, the newest `keep_recent_turns` turns stay and older turns are kept by
+    # relevance to the current message instead of simply by recency.
+    graph_token_budget: int = Field(default=0, ge=0)
+    keep_recent_turns: int = Field(default=2, ge=0)
 
 
 class DreamConfig(Base):
@@ -463,6 +474,13 @@ class Config(BaseSettings):
         if not type(self).__pydantic_complete__:
             _resolve_tool_config_refs()
         super().__init__(**values)
+
+    @classmethod
+    def model_validate(cls, *args: Any, **kwargs: Any) -> "Config":
+        # ``model_validate`` does not go through ``__init__``, so give it the same lazy guard.
+        if not cls.__pydantic_complete__:
+            _resolve_tool_config_refs()
+        return super().model_validate(*args, **kwargs)
 
     def bind_source_path(self, path: Path) -> None:
         """Record the config file that owns instance-level runtime data."""
