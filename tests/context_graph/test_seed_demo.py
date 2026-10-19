@@ -64,3 +64,15 @@ def test_scenarios_refuse_to_run_twice_and_both_can_share_a_workspace(tmp_path):
     with pytest.raises(SystemExit):
         main([str(ws), "--scenario", "noise"])
     assert main([str(tmp_path / "ws2"), "--scenario", "noise", "--report"]) == 0
+
+
+def test_seeded_chats_end_with_an_answered_turn_so_a_live_question_is_not_merged(tmp_path):
+    from scripts.seed_demo import NOISE, RECORDED_REPLY, seed_noise
+
+    manager = SessionManager(tmp_path / "ws", sessions_root=tmp_path / "files")
+    seed(manager)
+    seed_noise(manager)
+    for key in (ROOT, NOISE):
+        messages = manager.read_session_snapshot(key).messages
+        assert [m["role"] for m in messages[-2:]] == ["user", "assistant"]
+        assert messages[-1]["content"] == RECORDED_REPLY
