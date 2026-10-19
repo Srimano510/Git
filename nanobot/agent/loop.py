@@ -55,7 +55,8 @@ from nanobot.bus.queue import MessageBus
 from nanobot.bus.runtime_events import RuntimeEventBus
 from nanobot.command import CommandContext, CommandRouter, register_builtin_commands
 from nanobot.config.schema import AgentDefaults, ContextGraphConfig, ModelPresetConfig
-from nanobot.context_graph import ContextResult, GraphContextEngine
+from nanobot.context_graph import ContextResult, GraphContextEngine, observatory
+from nanobot.context_graph.observatory import Real
 from nanobot.context_graph.workflow import build_workflow
 from nanobot.llm_usage.context import source_from_request
 from nanobot.providers.base import LLMProvider, LLMUsage, ProviderConversationState
@@ -776,14 +777,17 @@ class AgentLoop:
         else:
             history = session.get_history(extend_to_user=is_subagent)
         name = result.strategy if result else "linear"
+        elapsed_ms = (time.perf_counter() - started) * 1000
         if not is_subagent:
-            # The Observatory rebuilds every strategy from the chat as it was before this turn.
-            session.metadata["_last_turn"] = {
+            record: dict[str, Any] = {
                 "strategy": name,
                 "at": len(session.messages),
                 "max_tokens": self.context_window_tokens,
                 "graph_config": self.context_graph_config.model_dump(),
             }
+            session.metadata["_last_turn"] = record
+            if self.context_graph_config.record_comparison:
+                self._record_comparison(session, query, record, Real(name, history, elapsed_ms, result))
         recall = f" recall={result.diagnostics.get('semantic_hits', 0)}" if name == "hybrid" and result else ""
         logger.info(
             "Context strategy={} nodes={} tokens={} ms={:.1f}{}",
@@ -794,6 +798,18 @@ class AgentLoop:
             recall,
         )
         return history, result
+
+    def _record_comparison(
+        self, session: Session, query: str, record: dict[str, Any], real: Real
+    ) -> None:
+        """Store the three-strategy comparison for this turn (diagnostic; never affects the turn)."""
+        try:
+            record["comparison"] = observatory.compare(
+                session, query, record,
+                self.sessions.read_session_snapshot, self.sessions.list_sessions, real=real,
+            )
+        except Exception as exc:
+            logger.warning("Observatory comparison skipped: {}", exc)
 
     def _build_transcript_input(self, ctx: TurnContext) -> TranscriptInput:
         """Capture the persisted history and fresh input as separate transcript parts."""

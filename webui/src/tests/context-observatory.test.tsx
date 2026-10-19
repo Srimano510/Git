@@ -33,6 +33,7 @@ const payload: ObservatoryPayload = {
       in: { linear: true, graph: true, hybrid: false }, reason: {} },
   ],
   only: { linear: 0, graph: 0, hybrid: 0 },
+  omitted: 0,
 };
 
 function stubFetch(body: unknown, status = 200) {
@@ -102,6 +103,29 @@ describe("ContextObservatory", () => {
     fireEvent.click(screen.getByLabelText("Differences only"));
     await waitFor(() => expect(screen.getAllByTestId("observatory-row")).toHaveLength(2));
     expect(screen.queryByText("shared answer")).toBeNull();
+  });
+
+  it("says whether the numbers were recorded with the turn or rebuilt afterwards", async () => {
+    stubFetch({ ...payload, reconstructed: false });
+    const { unmount } = renderOpen();
+    expect(await screen.findByText(/Recorded when the turn was built/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rebuilt from the chat/)).toBeNull();
+    unmount();
+
+    stubFetch({ ...payload, reconstructed: true });
+    renderOpen();
+    expect(await screen.findByText(/Rebuilt from the chat as it was before the last turn/)).toBeInTheDocument();
+  });
+
+  it("tells how many shared messages the capped list leaves out", async () => {
+    stubFetch({ ...payload, omitted: 7 });
+    const { unmount } = renderOpen();
+    expect(await screen.findByText("7 more shared messages are not listed.")).toBeInTheDocument();
+    unmount();
+    stubFetch({ ...payload, omitted: 0 });
+    renderOpen();
+    await screen.findAllByTestId("observatory-row");
+    expect(screen.queryByText(/not listed/)).toBeNull();
   });
 
   it("labels nodes of the open chat as #n and nodes of other chats with a short tag", async () => {

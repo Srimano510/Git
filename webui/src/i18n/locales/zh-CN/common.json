@@ -1412,6 +1412,8 @@
       "error": "无法加载上下文：{{message}}",
       "query": "最后一条消息：{{text}}",
       "reconstructed": "根据上一轮之前的聊天状态重建。之后的压缩可能使其与模型实际收到的内容不同。",
+      "recorded": "在构建该轮时记录：所用策略的数字是真实值。",
+      "omitted": "另有 {{count}} 条共有消息未列出。",
       "strategy": {
         "linear": "线性",
         "graph": "图",

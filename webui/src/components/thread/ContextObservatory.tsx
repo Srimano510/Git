@@ -113,7 +113,7 @@ export default function ContextObservatory({
             <p className="border-b px-4 py-2 text-xs text-muted-foreground">
               {t("thread.observatory.query", { text: data.query })}
               <br />
-              {t("thread.observatory.reconstructed")}
+              {t(data.reconstructed ? "thread.observatory.reconstructed" : "thread.observatory.recorded")}
             </p>
 
             <section className="grid gap-3 border-b p-4 sm:grid-cols-3">
@@ -198,6 +198,11 @@ export default function ContextObservatory({
                 <input type="checkbox" checked={diffOnly} onChange={(e) => setDiffOnly(e.target.checked)} />
                 {t("thread.observatory.diffOnly")}
               </label>
+              {data.omitted ? (
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {t("thread.observatory.omitted", { count: data.omitted })}
+                </p>
+              ) : null}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
