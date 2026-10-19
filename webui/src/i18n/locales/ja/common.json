@@ -1410,6 +1410,7 @@
       "tokens": "{{count}} トークン",
       "ms": "{{value}} ms",
       "recalled": "{{count}} 件を想起",
+      "summariesUsed": "要約 {{count}} 件を使用",
       "pruned": "関連性で {{count}} 件を除外",
       "embedder": "埋め込み: {{name}}",
       "onlyIn": "ここだけ {{count}} 件",

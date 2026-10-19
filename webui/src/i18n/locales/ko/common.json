@@ -1410,6 +1410,7 @@
       "tokens": "토큰 {{count}}개",
       "ms": "{{value}} ms",
       "recalled": "{{count}}개 회상",
+      "summariesUsed": "요약 {{count}}개 사용",
       "pruned": "관련성으로 {{count}}개 제외",
       "embedder": "임베더: {{name}}",
       "onlyIn": "여기에만 {{count}}개",

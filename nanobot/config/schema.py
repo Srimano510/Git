@@ -72,6 +72,9 @@ class ContextGraphConfig(Base):
     # sent to the model) and store the comparison so the Observatory is exact. Costs two extra
     # context builds per turn; turn it off if that matters.
     record_comparison: bool = True
+    # `/context summarize`: the longest range it will send to the model, and the summary's size.
+    summary_max_messages: int = Field(default=80, ge=1)
+    summary_max_tokens: int = Field(default=300, ge=1)
 
 
 class DreamConfig(Base):

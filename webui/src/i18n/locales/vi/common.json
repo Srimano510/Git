@@ -1410,6 +1410,7 @@
       "tokens": "{{count}} token",
       "ms": "{{value}} ms",
       "recalled": "{{count}} được gợi lại",
+      "summariesUsed": "{{count}} bản tóm tắt được dùng",
       "pruned": "{{count}} bị loại theo độ liên quan",
       "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} chỉ có ở đây",

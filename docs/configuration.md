@@ -2197,7 +2197,9 @@ Per-session context strategies, switched with `/context <strategy>` or the toggl
     "semanticModel": "minishlab/potion-base-8M",
     "graphTokenBudget": 0,
     "keepRecentTurns": 2,
-    "recordComparison": true
+    "recordComparison": true,
+    "summaryMaxMessages": 80,
+    "summaryMaxTokens": 300
   }
 }
 ```
@@ -2212,11 +2214,13 @@ Per-session context strategies, switched with `/context <strategy>` or the toggl
 | `semanticModel` | `minishlab/potion-base-8M` | The model2vec model (about 30 MB, 256 dimensions, runs on CPU). Stored under the nanobot data directory (`models/hub`), not the global Hugging Face cache. |
 | `graphTokenBudget` | `0` | History tokens for `graph` and `hybrid`. `0`: the model's whole context window, as before. When set and the replay is larger, the newest `keepRecentTurns` turns are kept and older turns are kept by similarity to the current message (a turn is a user message plus everything up to the next one, so tool calls stay with their results) instead of simply the newest that fit. The recalled block has its own cap (`recallTokenBudget`). |
 | `keepRecentTurns` | `2` | Newest turns that are always kept when pruning (even if they alone exceed the budget). |
+| `summaryMaxMessages` | `80` | `/context summarize` refuses ranges longer than this (messages sent to the model). |
+| `summaryMaxTokens` | `300` | Size cap of a generated summary (also the model call's `max_tokens`). |
 | `recordComparison` | `true` | After building a turn's context, also build the other two strategies (diagnostic only, never sent to the model) and store the comparison in the session, so the WebUI Context Observatory is exact: the used strategy's numbers are the real ones and compaction after the turn cannot change them. Costs two extra context builds per turn; set `false` to skip it (the Observatory then rebuilds the comparison on demand, which can drift after compaction). The stored list holds at most 120 nodes (differences first); counts and tokens always cover every node. |
 
 Optional semantic embedder (local, no API key): `uv sync --extra semantic`, then once `python -m nanobot.context_graph.embed` to download the model (it prints a similarity sample: "car" vs "automobile" scores about 0.78, "car" vs "banana" about 0.04). The OpenCode Zen provider documents no embeddings endpoint, so the model runs locally.
 
-Per-session commands: `/context hybrid archived|family|default` (override the pool; `default` clears it), `/context summary <from> <to> <text>` (summarise messages `from..to` of this session; used only when those messages are not replayed), `/context summary` (list), `/context summary clear`. Message numbers are the node numbers shown in the WebUI chat tree. The tree marks what the last turn used (vector / summary / in context).
+Per-session commands: `/context hybrid archived|family|default` (override the pool; `default` clears it), `/context summary <from> <to> <text>` (summarise messages `from..to` of this session; used only when those messages are not replayed), `/context summarize <from> <to>` (the same, but the configured model writes the summary; marked generated), `/context summary` (list), `/context summary clear`. In `hybrid` mode with a `graphTokenBudget`, turns fully covered by a stored summary are the first to be dropped, because the summary stands in for them. Message numbers are the node numbers shown in the WebUI chat tree. The tree marks what the last turn used (vector / summary / in context).
 
 ## Auto Compact
 

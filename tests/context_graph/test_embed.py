@@ -158,3 +158,51 @@ def test_each_embedder_carries_its_own_recall_cutoff():
     # dense-model scores for unrelated text reach ~0.2 while real matches stay above ~0.4
     assert HashEmbedder().default_min_score == 0.15
     assert Model2VecEmbedder(model=FakeModel()).default_min_score == 0.30
+
+
+# --- the loader must not touch the network when the model is already cached ------------------
+
+
+class FakeHub:
+    def __init__(self, cached: bool):
+        self.cached, self.calls = cached, []
+
+    def snapshot_download(self, repo, *, local_files_only, **kw):
+        self.calls.append(local_files_only)
+        if local_files_only and not self.cached:
+            raise FileNotFoundError("not in the local cache")
+        return f"/models/{repo}"
+
+
+def patch_loader(monkeypatch, hub):
+    import importlib
+
+    import model2vec
+
+    real = importlib.import_module
+    monkeypatch.setattr(importlib, "import_module", lambda name, *a: hub if name == "huggingface_hub" else real(name, *a))
+    loaded = []
+    monkeypatch.setattr(model2vec.StaticModel, "from_pretrained", classmethod(lambda cls, path, *a, **k: loaded.append(path) or FakeModel()))
+    return loaded
+
+
+@pytest.mark.skipif(importlib.util.find_spec("model2vec") is None, reason="model2vec not installed")
+def test_a_cached_model_is_loaded_without_any_network_call_even_when_downloads_are_allowed(monkeypatch):
+    hub = FakeHub(cached=True)
+    loaded = patch_loader(monkeypatch, hub)
+    Model2VecEmbedder("org/m", allow_download=True)
+    assert hub.calls == [True] and loaded == ["/models/org/m"]  # one local lookup, no download attempt
+
+
+@pytest.mark.skipif(importlib.util.find_spec("model2vec") is None, reason="model2vec not installed")
+def test_a_missing_model_is_downloaded_only_when_allowed(monkeypatch):
+    hub = FakeHub(cached=False)
+    loaded = patch_loader(monkeypatch, hub)
+    Model2VecEmbedder("org/m", allow_download=True)
+    assert hub.calls == [True, False] and loaded == ["/models/org/m"]  # local first, then the one download
+
+    hub2 = FakeHub(cached=False)
+    patch_loader(monkeypatch, hub2)
+    with pytest.raises(FileNotFoundError):
+        Model2VecEmbedder("org/m", allow_download=False)
+    assert hub2.calls == [True]  # never went online

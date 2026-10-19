@@ -1424,6 +1424,7 @@
       "tokens": "{{count}} tokens",
       "ms": "{{value}} ms",
       "recalled": "{{count}} recuperados",
+      "summariesUsed": "{{count}} resumos usados",
       "pruned": "{{count}} descartados por relevância",
       "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} só aqui",

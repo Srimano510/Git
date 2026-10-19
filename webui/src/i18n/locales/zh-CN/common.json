@@ -1424,6 +1424,7 @@
       "tokens": "{{count}} 个 token",
       "ms": "{{value}} 毫秒",
       "recalled": "召回 {{count}} 条",
+      "summariesUsed": "使用了 {{count}} 条摘要",
       "pruned": "按相关性剔除 {{count}} 条",
       "embedder": "嵌入器：{{name}}",
       "onlyIn": "仅此处 {{count}} 条",

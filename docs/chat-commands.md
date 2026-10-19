@@ -13,6 +13,7 @@ These commands work inside chat channels and interactive agent sessions:
 | `/context` | Show the context strategy, hybrid pool, summaries and links of this chat |
 | `/context linear\|graph\|hybrid` | Switch the context strategy for this chat (`/context hybrid archived\|family\|default` also sets the recall pool) |
 | `/context summary <from> <to> <text>` | Store a manual summary of messages `from..to`; `/context summary` lists, `/context summary clear` removes them |
+| `/context summarize <from> <to>` | Ask the model to write a summary of messages `from..to`; stored like a manual one and marked generated. Nothing is stored if the call fails |
 | `/context link <chat key>#<n> [<m>]` | Link message `n` of another chat (and its history) into message `m` of this chat (default: the latest). `graph` and `hybrid` then include it |
 | `/context links` | List this chat's links |
 | `/context unlink <n>` | Remove link number `n` |

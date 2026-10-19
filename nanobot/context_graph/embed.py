@@ -107,12 +107,20 @@ class Model2VecEmbedder:
         from model2vec import StaticModel
 
         hub: Any = importlib.import_module("huggingface_hub")  # its overloads are partly untyped
-        path = hub.snapshot_download(
-            model_name,
-            cache_dir=cache_dir or _models_dir(),
-            allow_patterns=_MODEL_FILES,  # a static model is just these; skip the repo's extras
-            local_files_only=not allow_download,
-        )
+        def fetch(local_only: bool) -> str:
+            return hub.snapshot_download(
+                model_name,
+                cache_dir=cache_dir or _models_dir(),
+                allow_patterns=_MODEL_FILES,  # a static model is just these; skip the repo's extras
+                local_files_only=local_only,
+            )
+
+        try:  # the cache first: even a cached model's download call would otherwise go online
+            path = fetch(True)
+        except Exception:
+            if not allow_download:
+                raise
+            path = fetch(False)
         return StaticModel.from_pretrained(path)
 
     def embed(self, text: str) -> Vector:
