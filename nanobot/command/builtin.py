@@ -101,9 +101,9 @@ BUILTIN_COMMAND_SPECS: tuple[BuiltinCommandSpec, ...] = (
     BuiltinCommandSpec(
         "/context",
         "Switch context strategy",
-        "Show or switch the context strategy (linear or graph).",
+        "Show or switch the context strategy (linear, graph or hybrid); link chats with link/links/unlink.",
         "history",
-        "[strategy]",
+        "[strategy|link|links|unlink]",
         accepts_args=True,
     ),
     BuiltinCommandSpec(
@@ -427,6 +427,7 @@ async def cmd_model(ctx: CommandContext) -> OutboundMessage:
 
 async def cmd_context(ctx: CommandContext) -> OutboundMessage:
     """Show or switch context strategy; manage hybrid-mode pool and summaries."""
+    from nanobot.context_graph.links import list_links
     from nanobot.context_graph.summaries import add_summary, clear_summaries, list_summaries
 
     loop = ctx.loop
@@ -448,8 +449,10 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
             f"- Hybrid pool: `{session.metadata.get('context_pool', 'config default')}`\n"
             f"- Summaries: {len(list_summaries(session))}\n"
             "- Available strategies: `linear`, `graph`, `hybrid`\n"
+            f"- Links: {len(list_links(session))}\n"
             "- Switch with `/context <strategy>`; `/context hybrid archived|family|default`; "
-            "`/context summary <from> <to> <text>`"
+            "`/context summary <from> <to> <text>`; "
+            "`/context link <chat key>#<n> [<m>]`, `/context links`, `/context unlink <n>`"
         )
 
     if head == "summary":
@@ -471,6 +474,9 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
         loop.sessions.save(session)
         return reply(f"Saved summary for messages {start}-{end}.")
 
+    if head in {"link", "links", "unlink"}:
+        return reply(_context_links(loop, session, head, rest))
+
     if head in {"linear", "graph", "context_graph", "hybrid"}:
         strategy = "graph" if head == "context_graph" else head
         pool = rest.lower()
@@ -487,6 +493,55 @@ async def cmd_context(ctx: CommandContext) -> OutboundMessage:
 
     return reply(
         f"Unknown context strategy: `{raw_args}`. Available strategies: `linear`, `graph`, `hybrid`."
+    )
+
+
+def _context_links(loop: AgentLoop, session: Session, head: str, rest: str) -> str:
+    """``/context link|links|unlink``: manual CONTEXT edges into this chat (see ``context_graph.links``)."""
+    from nanobot.context_graph.links import add_link, list_links, parse_node, remove_link
+    from nanobot.context_graph.tree import message_text
+    from nanobot.runtime_context import public_history_message
+
+    def preview(key: str, index: int) -> str:
+        owner = session if key == session.key else loop.sessions.read_session_snapshot(key)
+        if owner is None or index >= len(owner.messages):
+            return "?"
+        text = " ".join(message_text(public_history_message(owner.messages[index])).split())
+        return text if len(text) <= 60 else text[:60] + "…"
+
+    if head == "links":
+        links = list_links(session)
+        return "\n".join(
+            f"{n.number}. `{n.source[0]}#{n.source[1]}` \"{preview(*n.source)}\" -> "
+            f"message {n.target[1]} \"{preview(*n.target)}\""
+            for n in links
+        ) or "No links. Use `/context link <chat key>#<n> [<m>]`."
+
+    if head == "unlink":
+        if not rest.isdigit():
+            return "Usage: `/context unlink <n>` (numbers from `/context links`)"
+        try:
+            gone = remove_link(session, int(rest))
+        except ValueError as exc:
+            return f"Could not remove link: {exc}."
+        loop.sessions.save(session)
+        return f"Removed link {gone.number} (`{gone.source[0]}#{gone.source[1]}`)."
+
+    usage = "Usage: `/context link <chat key>#<n> [<m>]` (message `n` of that chat feeds message `m` of this one; default: the latest)"
+    parts = rest.split()
+    if not 1 <= len(parts) <= 2 or (len(parts) == 2 and not parts[1].isdigit()):
+        return usage
+    try:
+        source = parse_node(parts[0])
+        link = add_link(
+            session, source, int(parts[1]) if len(parts) == 2 else None, loop.sessions.read_session_snapshot
+        )
+    except ValueError as exc:
+        return f"Could not link: {exc}. {usage}" if "not a message id" in str(exc) else f"Could not link: {exc}."
+    loop.sessions.save(session)
+    return (
+        f"Linked `{link.source[0]}#{link.source[1]}` into message {link.target[1]} of this chat "
+        f"(link {link.number}). Graph and hybrid context now include it."
     )
 
 

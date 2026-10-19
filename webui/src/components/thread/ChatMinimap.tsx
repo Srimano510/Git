@@ -14,7 +14,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Map as MapIcon, Maximize2, Minimize2, Workflow, X } from "lucide-react";
+import { Link2, Map as MapIcon, Maximize2, Minimize2, Workflow, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -42,6 +42,8 @@ interface ChatNodeData extends Record<string, unknown> {
   kind?: "history" | "vector" | "summary";
   /** A folded run whose messages were part of the last turn's context. */
   inContext?: boolean;
+  /** Link mode only: can this message be linked into the open chat? */
+  linkable?: boolean;
 }
 
 const KIND_COLOR = { vector: "#f59e0b", summary: "#14b8a6" } as const;
@@ -65,7 +67,7 @@ const handles = (
 const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNodeData>>) {
   const { t } = useTranslation();
   const zoom = useStore((s) => s.transform[2]);
-  const { node, count, active, selected, kind, inContext } = data;
+  const { node, count, active, selected, kind, inContext, linkable } = data;
   const flagged = kind === "vector" || kind === "summary" ? kind : null;
   const ring = selected
     ? "ring-2 ring-amber-500"
@@ -92,10 +94,10 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
         style={{
           ...MESSAGE_SIZE,
           background: roleColor(node.role),
-          opacity: active ? 1 : 0.55,
+          opacity: linkable === false ? 0.25 : active ? 1 : 0.55,
           ...(flagged ? { outline: `4px solid ${KIND_COLOR[flagged]}` } : {}),
         }}
-        className={cn("rounded-md", ring)}
+        className={cn("rounded-md", ring, linkable && "cursor-pointer ring-2 ring-sky-500")}
       >
         {handles}
       </div>
@@ -104,11 +106,14 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
   return (
     <div
       data-testid="minimap-node"
+      data-linkable={linkable === undefined ? undefined : String(linkable)}
       style={MESSAGE_SIZE}
       className={cn(
         "overflow-hidden rounded-md border bg-card px-2 py-1 text-left text-[11px] leading-snug",
         active ? "" : "opacity-70",
         ring,
+        linkable === false && "cursor-not-allowed opacity-30",
+        linkable && "cursor-pointer ring-2 ring-sky-500",
       )}
     >
       {handles}
@@ -185,6 +190,8 @@ interface ChatMinimapProps {
   theme?: "light" | "dark";
   /** `isTip` is true for the last message of any chat (nothing to branch from). */
   onSelectNode: (node: TreeNode, isTip: boolean) => void;
+  /** Sends `/context link` for a node of another branch; enables the panel's link mode. */
+  onLink?: (node: TreeNode) => Promise<void>;
   onClose: () => void;
 }
 
@@ -195,6 +202,7 @@ export function ChatMinimap({
   selectedNodeId = null,
   theme = "light",
   onSelectNode,
+  onLink,
   onClose,
 }: ChatMinimapProps) {
   const { t } = useTranslation();
@@ -204,6 +212,10 @@ export function ChatMinimap({
   const [wide, setWide] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [linkMode, setLinkMode] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<"ok" | "failed" | null>(null);
+  const [refetchNonce, setRefetchNonce] = useState(0);
+  const awaitingLink = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,6 +224,12 @@ export function ChatMinimap({
         if (cancelled) return;
         setPayload(p);
         setError(null);
+        // After a link command, the refetched tree tells whether the link really exists.
+        const linked = awaitingLink.current;
+        if (linked) {
+          awaitingLink.current = null;
+          setLinkStatus(p.edges.some((e) => e.type === "CONTEXT" && e.source === linked) ? "ok" : "failed");
+        }
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -219,7 +237,25 @@ export function ChatMinimap({
     return () => {
       cancelled = true;
     };
-  }, [token, sessionKey, refreshKey]);
+  }, [token, sessionKey, refreshKey, refetchNonce]);
+
+  // Messages of the open chat's own history cannot be linked into it.
+  const activeIds = useMemo(
+    () => (payload ? ancestorIds(payload.edges, payload.tips[sessionKey]) : new Set<string>()),
+    [payload, sessionKey],
+  );
+
+  const startLink = (node: TreeNode) => {
+    setLinkMode(false);
+    setLinkStatus(null);
+    onLink?.(node).then(
+      () => {
+        awaitingLink.current = node.id;
+        setRefetchNonce((n) => n + 1); // cancels fetches that started before the command finished
+      },
+      () => setLinkStatus("failed"),
+    );
+  };
 
   const { nodes, edges, focus } = useMemo(() => {
     if (!payload) {
@@ -249,6 +285,7 @@ export function ChatMinimap({
         selected: n.id === selectedNodeId,
         kind: payload.context?.[n.id],
         inContext: n.members?.some((m) => payload.context?.[m] === "history"),
+        linkable: linkMode && n.node ? !activeIds.has(n.node.id) : undefined,
       },
     }));
     const flowEdges = folded.edges.map<Edge>((e) => ({
@@ -260,6 +297,7 @@ export function ChatMinimap({
         stroke: "#94a3b8",
         strokeWidth: 1.5,
         ...(e.type === "BRANCH" ? { strokeDasharray: "5 4" } : {}),
+        ...(e.type === "CONTEXT" ? { strokeDasharray: "2 4", stroke: "#0ea5e9" } : {}),
         ...(e.type === "TRIGGERS" || e.type === "FEEDS" ? { stroke: WORKFLOW_COLOR } : {}),
       },
     }));
@@ -270,8 +308,9 @@ export function ChatMinimap({
       .slice(0, 6)
       .map((n) => ({ id: n.id }));
     if (workflow) focusNodes.push(...workflow.nodes.map((w) => ({ id: w.id })));
+    if (linkMode) focusNodes.push(...flowNodes.filter((n) => n.data.linkable).map((n) => ({ id: n.id })));
     return { nodes: flowNodes, edges: flowEdges, focus: focusNodes };
-  }, [payload, expanded, selectedNodeId, sessionKey, showWorkflow]);
+  }, [payload, expanded, selectedNodeId, sessionKey, showWorkflow, linkMode, activeIds]);
 
   return (
     <aside
@@ -292,6 +331,19 @@ export function ChatMinimap({
           >
             <MapIcon size={14} />
           </button>
+          {onLink ? (
+            <button
+              type="button"
+              aria-label={t(linkMode ? "thread.chatTree.cancelLink" : "thread.chatTree.link")}
+              aria-pressed={linkMode}
+              onClick={() => {
+                setLinkMode((v) => !v);
+                setLinkStatus(null);
+              }}
+            >
+              <Link2 size={14} />
+            </button>
+          ) : null}
           {payload?.workflow ? (
             <button
               type="button"
@@ -314,6 +366,19 @@ export function ChatMinimap({
           </button>
         </span>
       </header>
+      {linkMode ? (
+        <p className="border-b bg-sky-500/10 px-3 py-1 text-[11px]">{t("thread.chatTree.linkHint")}</p>
+      ) : null}
+      {linkStatus === "ok" ? (
+        <p role="status" className="border-b bg-emerald-500/10 px-3 py-1 text-[11px]">
+          {t("thread.chatTree.linked")}
+        </p>
+      ) : null}
+      {linkStatus === "failed" ? (
+        <p role="alert" className="border-b bg-red-500/10 px-3 py-1 text-[11px] text-red-600 dark:text-red-400">
+          {t("thread.chatTree.linkFailed")}
+        </p>
+      ) : null}
       {payload?.context ? (
         <p data-testid="minimap-legend" className="border-b px-3 py-1 text-[11px] text-muted-foreground">
           {t("thread.chatTree.lastTurn", { strategy: payload.context_strategy ?? "graph" })}{" "}
@@ -350,13 +415,17 @@ export function ChatMinimap({
             onNodeClick={(_, n) => {
               const data = n.data as ChatNodeData;
               if (data.workflow) return;
+              if (linkMode && data.node) {
+                if (!activeIds.has(data.node.id)) startLink(data.node);
+                return;
+              }
               if (data.node) {
                 onSelectNode(data.node, Object.values(payload?.tips ?? {}).includes(data.node.id));
               }
               else setExpanded((prev) => new Set(prev).add(n.id));
             }}
           >
-            <FocusOnLoad focus={focus} chatKey={`${sessionKey}:${wide}:${showWorkflow}`} />
+            <FocusOnLoad focus={focus} chatKey={`${sessionKey}:${wide}:${showWorkflow}:${linkMode}`} />
             <Background />
             <Controls showInteractive={false} />
             {showOverview ? (

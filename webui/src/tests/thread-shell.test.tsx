@@ -1780,7 +1780,7 @@ describe("ThreadShell", () => {
     expect(screen.queryByText(/Branching from/)).not.toBeInTheDocument();
   });
 
-  it("keeps the header and composer context-strategy toggles in sync and persists via /context", async () => {
+  it("has a single context-strategy toggle, in the composer, and persists the choice via /context", async () => {
     const client = makeClient();
     vi.stubGlobal(
       "fetch",
@@ -1793,35 +1793,88 @@ describe("ThreadShell", () => {
       ),
     );
     const badges = () =>
-      screen.getAllByText(/^(linear|graph)$/i).map((el) => el.closest("button") as HTMLElement);
-    await waitFor(() => expect(badges()).toHaveLength(2));
-    expect(badges().map((b) => b.textContent)).toEqual(["linear", "linear"]);
+      screen.getAllByText(/^(linear|graph|hybrid)$/i).map((el) => el.closest("button") as HTMLElement);
+    await waitFor(() => expect(badges()).toHaveLength(1));
+    expect(badges()[0].textContent).toBe("linear");
+    expect(badges()[0].closest("header")).toBeNull(); // not in the thread header any more
 
-    // header toggle drives the same state and the real backend command
     fireEvent.pointerDown(badges()[0], { button: 0, ctrlKey: false });
-    fireEvent.click(badges()[0]);
     fireEvent.click(await screen.findByText("Graph (DAG Pruning)"));
     await waitFor(() =>
       expect(client.sendSystemCommand).toHaveBeenCalledWith("strat-chat", "/context graph"),
     );
-    expect(badges().map((b) => b.textContent)).toEqual(["graph", "graph"]);
+    expect(badges()).toHaveLength(1);
+    expect(badges()[0].textContent).toBe("graph");
   });
 
-  it("offers a Hybrid strategy that syncs both toggles and sends /context hybrid", async () => {
+  it("offers a Hybrid strategy that sends /context hybrid", async () => {
     const client = makeClient();
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })));
     render(
       wrap(client, <ThreadShell session={session("hyb-chat")} title="Hyb" onToggleSidebar={() => {}} />),
     );
-    const badges = () =>
-      screen.getAllByText(/^(linear|graph|hybrid)$/i).map((el) => el.closest("button") as HTMLElement);
-    await waitFor(() => expect(badges()).toHaveLength(2));
-    fireEvent.pointerDown(badges()[1], { button: 0, ctrlKey: false });
+    const badge = async () =>
+      (await screen.findAllByText(/^(linear|graph|hybrid)$/i))[0].closest("button") as HTMLElement;
+    fireEvent.pointerDown(await badge(), { button: 0, ctrlKey: false });
     fireEvent.click(await screen.findByText("Hybrid (Graph + Vector)"));
     await waitFor(() =>
       expect(client.sendSystemCommand).toHaveBeenCalledWith("hyb-chat", "/context hybrid"),
     );
-    expect(badges().map((b) => b.textContent)).toEqual(["hybrid", "hybrid"]);
+    expect((await badge()).textContent).toBe("hybrid");
+  });
+
+  it("links a message of another branch into this chat through /context link", async () => {
+    const client = makeClient();
+    const here = "websocket:link-chat";
+    const other = "websocket:other-chat";
+    const node = (key: string, index: number, role: string) => ({
+      id: `${key}#${index}`, session_key: key, index, role, preview: `${key}-${index}`,
+      fork_before_user_index: Math.ceil(index / 2),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("websocket%3Alink-chat/graph")) {
+          return httpJson({
+            root: here,
+            nodes: [node(here, 0, "user"), node(here, 1, "assistant"), node(other, 0, "user"), node(other, 1, "assistant")],
+            edges: [
+              { source: `${here}#0`, target: `${here}#1`, type: "REPLY" },
+              { source: `${other}#0`, target: `${other}#1`, type: "REPLY" },
+            ],
+            tips: { [here]: `${here}#1`, [other]: `${other}#1` },
+          });
+        }
+        if (url.includes("websocket%3Alink-chat/webui-thread")) {
+          return httpJson(transcriptFromSimpleMessages([
+            { role: "user" as const, content: "q" },
+            { role: "assistant" as const, content: "a" },
+          ]));
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      }),
+    );
+    const onOpenChat = vi.fn();
+    render(
+      wrap(
+        client,
+        <ThreadShell session={session("link-chat")} title="Link chat" onToggleSidebar={() => {}} onOpenChat={onOpenChat} />,
+      ),
+    );
+    await screen.findByText("a");
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Link a message into this chat" }));
+    const el = await waitFor(() => {
+      const found = document.querySelector(`[data-id="${other}#1"]`);
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    fireEvent.click(el);
+    await waitFor(() =>
+      expect(client.sendSystemCommand).toHaveBeenCalledWith("link-chat", `/context link ${other}#1`),
+    );
+    expect(onOpenChat).not.toHaveBeenCalled(); // linking keeps you in this chat
   });
 
   it("sends normally when the tree selection is the tip", async () => {

@@ -1829,8 +1829,6 @@ const composer = (
   const threadHeader = !hideHeader ? (
     <ThreadHeader
       title={title}
-      contextStrategy={activeContextStrategy}
-      onContextStrategyChange={session ? handleContextStrategyChange : undefined}
       handle={temporary || (hideHeaderTitle && inlineHandle) ? null : session?.handle}
       onToggleSidebar={onToggleSidebar}
       theme={theme}
@@ -1920,6 +1918,9 @@ const composer = (
           theme={theme}
           selectedNodeId={branchFrom ? `${branchFrom.session_key}#${branchFrom.index}` : null}
           onSelectNode={handleSelectTreeNode}
+          onLink={async (node) => {
+            if (chatId) await client.sendSystemCommand(chatId, `/context link ${node.id}`);
+          }}
           onClose={() => setTreeOpen(false)}
         />
       ) : null}

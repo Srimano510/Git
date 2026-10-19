@@ -10,6 +10,12 @@ These commands work inside chat channels and interactive agent sessions:
 | `/status` | Show bot status |
 | `/model` | Show the current model and available model presets |
 | `/model <preset>` | Switch and persist the model preset for the current session |
+| `/context` | Show the context strategy, hybrid pool, summaries and links of this chat |
+| `/context linear\|graph\|hybrid` | Switch the context strategy for this chat (`/context hybrid archived\|family\|default` also sets the recall pool) |
+| `/context summary <from> <to> <text>` | Store a manual summary of messages `from..to`; `/context summary` lists, `/context summary clear` removes them |
+| `/context link <chat key>#<n> [<m>]` | Link message `n` of another chat (and its history) into message `m` of this chat (default: the latest). `graph` and `hybrid` then include it |
+| `/context links` | List this chat's links |
+| `/context unlink <n>` | Remove link number `n` |
 | `/dream` | Run Dream memory consolidation now |
 | `/dream-log` | Show the latest Dream memory change |
 | `/dream-log <sha>` | Show a specific Dream memory change |

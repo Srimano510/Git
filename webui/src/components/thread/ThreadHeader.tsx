@@ -3,10 +3,6 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import {
-  ContextStrategyBadge,
-  type ContextStrategy,
-} from "@/components/thread/ContextStrategyBadge";
 import { SessionHandleLabel } from "@/components/SessionHandleLabel";
 import {
   Tooltip,
@@ -34,8 +30,6 @@ interface ThreadHeaderProps {
   temporaryChatEnabled?: boolean;
   temporaryChatDisabled?: boolean;
   onTemporaryChatEnabledChange?: (enabled: boolean) => void;
-  contextStrategy?: ContextStrategy;
-  onContextStrategyChange?: (strategy: ContextStrategy) => void;
 }
 
 export function ThreadHeader({
@@ -55,8 +49,6 @@ export function ThreadHeader({
   temporaryChatEnabled = false,
   temporaryChatDisabled = false,
   onTemporaryChatEnabledChange,
-  contextStrategy,
-  onContextStrategyChange,
 }: ThreadHeaderProps) {
   const { t } = useTranslation();
 
@@ -100,12 +92,6 @@ export function ThreadHeader({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
-        {onContextStrategyChange ? (
-          <ContextStrategyBadge
-            strategy={contextStrategy}
-            onStrategyChange={onContextStrategyChange}
-          />
-        ) : null}
         {sessionInfoAction}
         {promptNavigatorAction}
         {actions}
