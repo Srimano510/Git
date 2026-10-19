@@ -351,6 +351,8 @@ export interface ObservatoryPayload {
   strategies: Record<ObservatoryStrategy, ObservatoryStrategyInfo>;
   nodes: ObservatoryNode[];
   only: Record<ObservatoryStrategy, number>;
+  /** Shared messages left out of `nodes` (the list is capped; counts always cover every node). */
+  omitted?: number;
 }
 
 export async function fetchContextResult(

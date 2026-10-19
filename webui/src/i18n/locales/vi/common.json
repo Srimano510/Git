@@ -1398,6 +1398,8 @@
       "error": "Không thể tải ngữ cảnh: {{message}}",
       "query": "Tin nhắn cuối: {{text}}",
       "reconstructed": "Được dựng lại từ cuộc trò chuyện như trước lượt cuối. Việc nén sau đó có thể khiến kết quả khác với những gì mô hình nhận được.",
+      "recorded": "Được ghi lại khi lượt được dựng: số liệu của chiến lược đã dùng là số liệu thật.",
+      "omitted": "{{count}} tin nhắn chung khác không được liệt kê.",
       "strategy": {
         "linear": "Tuyến tính",
         "graph": "Đồ thị",

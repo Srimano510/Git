@@ -5466,6 +5466,20 @@ async def test_handle_session_context_result_get_compares_strategies_per_chat(tm
         "websocket:b"
     }
 
+    # a turn that recorded its comparison is served as recorded, not rebuilt
+    rec = manager.get_or_create("websocket:rec")
+    rec.add_message("user", "q")
+    rec.add_message("assistant", "a")
+    rec.metadata["_last_turn"] = {
+        "strategy": "graph", "at": 2, "max_tokens": 100000, "graph_config": {},
+        "comparison": {"at": 2, "selected": "graph", "reconstructed": False, "query": "recorded query",
+                       "strategies": {}, "nodes": [], "only": {}, "omitted": 0},
+    }
+    rec.add_message("user", "next")
+    manager.save(rec)
+    recorded = json.loads((await get("websocket:rec")).body.decode())
+    assert recorded["reconstructed"] is False and recorded["query"] == "recorded query"
+
     assert (await get("websocket:fresh")).status_code == 404
     assert (await get("websocket:nope")).status_code == 404
     assert (await get("websocket:a", Headers([]))).status_code == 401

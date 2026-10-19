@@ -1412,6 +1412,8 @@
       "error": "Could not load context: {{message}}",
       "query": "Last message: {{text}}",
       "reconstructed": "Rebuilt from the chat as it was before the last turn. Compaction since then can make it differ from what the model received.",
+      "recorded": "Recorded when the turn was built: the numbers for the strategy that was used are the real ones.",
+      "omitted": "{{count}} more shared messages are not listed.",
       "strategy": {
         "linear": "Linear",
         "graph": "Graph",

@@ -1399,6 +1399,8 @@
       "error": "No se pudo cargar el contexto: {{message}}",
       "query": "Último mensaje: {{text}}",
       "reconstructed": "Reconstruido a partir del chat tal como estaba antes del último turno. La compactación posterior puede hacer que difiera de lo que recibió el modelo.",
+      "recorded": "Registrado al construir el turno: las cifras de la estrategia usada son las reales.",
+      "omitted": "{{count}} mensajes compartidos más no se muestran.",
       "strategy": {
         "linear": "Lineal",
         "graph": "Grafo",

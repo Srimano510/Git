@@ -1398,6 +1398,8 @@
       "error": "無法載入上下文：{{message}}",
       "query": "最後一則訊息：{{text}}",
       "reconstructed": "根據上一輪之前的聊天狀態重建。之後的壓縮可能使其與模型實際收到的內容不同。",
+      "recorded": "於建構該輪時記錄：所用策略的數字為真實值。",
+      "omitted": "另有 {{count}} 則共有訊息未列出。",
       "strategy": {
         "linear": "線性",
         "graph": "圖",

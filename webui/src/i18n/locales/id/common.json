@@ -1398,6 +1398,8 @@
       "error": "Tidak dapat memuat konteks: {{message}}",
       "query": "Pesan terakhir: {{text}}",
       "reconstructed": "Dibangun ulang dari obrolan seperti sebelum giliran terakhir. Pemadatan setelahnya dapat membuatnya berbeda dari yang diterima model.",
+      "recorded": "Dicatat saat giliran dibangun: angka strategi yang dipakai adalah angka sebenarnya.",
+      "omitted": "{{count}} pesan bersama lainnya tidak ditampilkan.",
       "strategy": {
         "linear": "Linear",
         "graph": "Graf",

@@ -1398,6 +1398,8 @@
       "error": "Impossible de charger le contexte : {{message}}",
       "query": "Dernier message : {{text}}",
       "reconstructed": "Reconstruit à partir de la conversation telle qu'elle était avant le dernier tour. Un compactage ultérieur peut le faire différer de ce que le modèle a reçu.",
+      "recorded": "Enregistré lors de la construction du tour : les chiffres de la stratégie utilisée sont les vrais.",
+      "omitted": "{{count}} autres messages communs ne sont pas listés.",
       "strategy": {
         "linear": "Linéaire",
         "graph": "Graphe",

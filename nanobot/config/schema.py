@@ -68,6 +68,10 @@ class ContextGraphConfig(Base):
     # relevance to the current message instead of simply by recency.
     graph_token_budget: int = Field(default=0, ge=0)
     keep_recent_turns: int = Field(default=2, ge=0)
+    # After building a turn's context, also build the other two strategies (diagnostic only, never
+    # sent to the model) and store the comparison so the Observatory is exact. Costs two extra
+    # context builds per turn; turn it off if that matters.
+    record_comparison: bool = True
 
 
 class DreamConfig(Base):
