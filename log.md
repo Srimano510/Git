@@ -14,8 +14,9 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - **Phase 3** (typed-edge DAG context resolution): COMPLETE. Plan: [docs/PHASE3-PLAN.md](docs/PHASE3-PLAN.md).
 - **Phase 3.5** (chat-tree minimap, node navigation, send-from-earlier-node branching): COMPLETE, browser-checked with Playwright. Plan: [docs/PHASE3_5-PLAN.md](docs/PHASE3_5-PLAN.md).
 - **Phase 4** (hybrid retrieval and summaries): COMPLETE, browser-checked, merged to `master` (PR #14 and polish PR #15). Plan and as-built notes: [docs/PHASE4-PLAN.md](docs/PHASE4-PLAN.md).
-- **Phase 5** (workflow DAG, optional): IMPLEMENTED on branch `phase5`, uncommitted, browser-checked end to end. Plan: [docs/PHASE5-PLAN.md](docs/PHASE5-PLAN.md).
-- **Open tasks**: owner to review and commit Phase 5. Temp test gateway and mock LLM stopped; 0 listening test sockets.
+- **Phase 5** (workflow DAG, optional): COMPLETE, browser-checked, merged to `master` (PR #16). Plan: [docs/PHASE5-PLAN.md](docs/PHASE5-PLAN.md).
+- **Phase 6** (Context Observatory and metrics): PLANNED on branch `phase6`, decisions D1-D4 recorded, no code written. Plan: [docs/PHASE6-PLAN.md](docs/PHASE6-PLAN.md).
+- **Open tasks**: owner to commit the Phase 6 plan docs, then approve implementation (P6-1 onward).
 
 ## Tasks
 
@@ -82,6 +83,18 @@ Single source of truth for context and task status (see `AGENTS.md`, *Context & 
 - [x] P5-8 Checks: full pytest 6516 passed, 58 skipped, 3 deselected (the two known unrelated: `test_equivalent_workspace_paths_share_one_store`, `test_mcp_reconnect_crash`); ruff clean; basedpyright 0 errors on touched files; vitest 1153/1153 on the second run (the first full run showed 52 failures in one file that did not reproduce, file not captured; likely load-related, see REVIEW-LATER); `bun run build` and `bun run lint` clean
 - [x] P5-9 Docs: `log.md`, MasterGuide, `docs/REVIEW-LATER.md`, `docs/DEMO-FEATURES.md`
 
+### Phase 6: Context Observatory and metrics (plan: docs/PHASE6-PLAN.md, decisions recorded, awaiting approval to implement)
+- [x] Owner decisions D1-D4 recorded (D1 rebuild on demand from the pre-turn snapshot; D2 all three strategies; D3 rewrite the existing drawer in place; D4 seed script writes the merge link, no `/context link`)
+- [x] P6-0 Audit (read-only). Findings: (1) `ContextObservatory.tsx` exists from Phase 1 but is broken: calls a non-existent `/context-result` route, sends no bearer token, is mounted with `sessionKey="current"`, hard-coded English, no tests, linear/graph only; (2) the `/graph` route and `session_context_payload` are the pattern for a sanitized route; (3) the HTTP route cannot see the loop's context window or `ContextGraphConfig`, so the loop must record them per turn; (4) the Phase 5 anchor logic (`tree._workflow`) is reusable for the turn's user message; (5) linear replay (`get_history`) keeps a short archived tail (`min(last_archived, recent_start)`) and skips `_command` messages, so linear and graph genuinely differ even in simple chats, and linear node ids must be inferred by the suffix rule; (6) no ranking step exists, so timing is traversal / vector / total
+- [ ] P6-1 Anchor helper extraction, `_last_turn` recording for every user turn, fork volatility, metrics log line + tests
+- [ ] P6-2 `context_graph/observatory.py` `build_observatory` + tests
+- [ ] P6-3 Route `GET /api/sessions/{key}/context-result` + tests
+- [ ] P6-4 WebUI: rewrite `ContextObservatory.tsx`, `fetchContextResult`, `ThreadShell` wiring, i18n (10 locales) + vitest
+- [ ] P6-5 `scripts/seed_demo.py` + `docs/DEMO-SCENARIO.md` + slide outline
+- [ ] P6-6 Playwright browser check (AGENTS.md *Browser check*)
+- [ ] P6-7 Checks: touched tests, full `pytest`, `ruff`, `basedpyright`, `bun run test/build/lint`
+- [ ] P6-8 Docs: `log.md`, MasterGuide, `docs/REVIEW-LATER.md`, `docs/DEMO-FEATURES.md`
+
 ## Change log
 
 Newest record last. Each record: timestamp, step, what changed, commit, status.
@@ -112,6 +125,7 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
 | 2026-10-18 | Polish pass (branch `polish`) | Restored the original `ThreadHeader.tsx` from before `7c20961c` and re-added the context toggle (the stripped header had dropped theme toggle, prompt navigator, session info, temporary-chat control: these were the 8 'pre-existing' WebUI failures); dropped the stale `sessionKey` prop from the call. `setup.ts` guards undefined `localStorage` (Node 26). Slash-command turns hidden from `tree.py` (edges bridged, tip moved) and excluded from `recall.py`. `derive.py` exposes `fork_of`/`canonical_node`; `summaries.py` resolves ranges canonically (fork prefix maps to source, inherited copies deduped, `Summary.head/nodes`). i18n: `thread.chatTree.*` keys in 10 locales, used in `ChatMinimap`, `ThreadShell`, `ContextStrategyBadge`. New `docs/DEMO-FEATURES.md`. Tests added: recall (`_command`), tree (`_command`), summaries (fork prefix, dedupe). Results: WebUI 1151/1151, build and lint clean; context_graph tests pass | uncommitted | SUCCESS |
 | 2026-10-19 | Phase 5 plan | Read-only audit (`engines.py`, `resolver.py`, `derive.py`, `tree.py`, `loop._graph_context`, `session/manager.py` volatile keys, `ChatMinimap`, `chat-tree.ts`). Added `docs/PHASE5-PLAN.md` (decisions D1-D4, guide deviations, design, tasks P5-0..P5-9, risks); Phase 5 tasks in `log.md`; corrected stale Phase 4 status (merged via PR #14/#15); MasterGuide Phase 5 deviations note; REVIEW-LATER Phase 5 planning note. Branch `phase5` from `master`. No code changed | uncommitted | SUCCESS |
 | 2026-10-19 | Phase 5 implementation | New: `context_graph/workflow.py` (`build_workflow`, `WORKFLOW_EDGES`); `model.py` (`EdgeType.TRIGGERS`/`FEEDS`); `agent/loop.py` (`_graph_context` records `_last_workflow`, skipped for subagent turns); `session/manager.py` (`_last_workflow` fork-volatile); `tree.py` (`_workflow`, additive `workflow` field with `anchor`); WebUI: `lib/chat-tree.ts` (`WorkflowNode`, `withWorkflow`, layout size), `ChatMinimap.tsx` (Workflow toggle, violet workflow nodes, legend, re-frame on toggle), `thread.chatTree.showWorkflow/hideWorkflow/workflowStep` in 10 locales. Tests: `tests/context_graph/test_workflow.py` (new), `test_tree.py` (workflow field), `chat-minimap.test.tsx` (2 cases). Docs: `docs/PHASE5-PLAN.md` section 6, `docs/DEMO-FEATURES.md`, MasterGuide, REVIEW-LATER. Results in P5-8 above | uncommitted | SUCCESS |
+| 2026-10-19 | Phase 6 plan | Branch `phase6` from `master` (Phase 5 merged, PR #16). Read-only audit (`ContextObservatory.tsx`, `ThreadShell` wiring, `ws_http.py` `/graph` and `/context` routes, `session_context.py`, `Session.get_history`, loop strategy selection). Added `docs/PHASE6-PLAN.md` (decisions D1-D4, guide deviations, design, tasks P6-0..P6-8, risks); Phase 6 tasks in `log.md`; MasterGuide Phase 6 deviations note; REVIEW-LATER Phase 6 planning note. No code changed | uncommitted | SUCCESS |
 
 ## Phase 1 Final Delivery Record
 - **Start commit**: `679199d4d02dcb5202bcc242b8f5cbb67fe84805`
