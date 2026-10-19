@@ -2185,15 +2185,18 @@ Per-session context strategies, switched with `/context <strategy>` or the toggl
 
 - `linear` (default): replay the session history.
 - `graph`: walk the typed-edge DAG of the chat family (forks) instead of one flat history.
-- `hybrid`: `graph`, plus a "[Recalled Context]" block in the system prompt with older messages that match the current message (hashed bag-of-words similarity, no model or API key needed) and any manual summaries that stand in for dropped ranges.
+- `hybrid`: `graph`, plus a "[Recalled Context]" block in the system prompt with older messages that match the current message and any manual summaries that stand in for dropped ranges. Similarity uses a local semantic model when the optional `semantic` extra is installed and its model is downloaded, otherwise hashed words (shared words only, no model or API key needed).
 
 ```json
 {
   "contextGraph": {
     "semanticPool": "archived",
     "semanticTopK": 3,
-    "semanticMinScore": 0.15,
-    "recallTokenBudget": 1500
+    "recallTokenBudget": 1500,
+    "semanticEmbedder": "auto",
+    "semanticModel": "minishlab/potion-base-8M",
+    "graphTokenBudget": 0,
+    "keepRecentTurns": 2
   }
 }
 ```
@@ -2202,8 +2205,14 @@ Per-session context strategies, switched with `/context <strategy>` or the toggl
 |---|---|---|
 | `semanticPool` | `archived` | Where recall may look. `archived`: this chat's own earlier messages that are no longer replayed (compacted or over budget). `family`: also every other branch of the chat family (breaks branch isolation, opt-in). |
 | `semanticTopK` | `3` | Maximum recalled messages per turn. |
-| `semanticMinScore` | `0.15` | Minimum similarity (0 to 1) for a message to be recalled. |
-| `recallTokenBudget` | `1500` | Token cap for the recalled block; the same amount is reserved from the history budget. |
+| `semanticMinScore` | unset | Minimum similarity (0 to 1) for a message to be recalled. Unset uses the embedder's own default: `0.15` for hashed words, `0.30` for the semantic model (it scores unrelated text up to about 0.2 and real matches from about 0.4). |
+| `recallTokenBudget` | `1500` | Token cap for the recalled block; the same amount is reserved from the history budget (unless `graphTokenBudget` is set). |
+| `semanticEmbedder` | `auto` | `auto`: the semantic model if the `semantic` extra is installed **and its model is already downloaded** (never downloads during a turn), else hashed words. `model2vec`: use the model and allow one download. `hash`: always hashed words. Any failure falls back to hashed words. |
+| `semanticModel` | `minishlab/potion-base-8M` | The model2vec model (about 30 MB, 256 dimensions, runs on CPU). Stored under the nanobot data directory (`models/hub`), not the global Hugging Face cache. |
+| `graphTokenBudget` | `0` | History tokens for `graph` and `hybrid`. `0`: the model's whole context window, as before. When set and the replay is larger, the newest `keepRecentTurns` turns are kept and older turns are kept by similarity to the current message (a turn is a user message plus everything up to the next one, so tool calls stay with their results) instead of simply the newest that fit. The recalled block has its own cap (`recallTokenBudget`). |
+| `keepRecentTurns` | `2` | Newest turns that are always kept when pruning (even if they alone exceed the budget). |
+
+Optional semantic embedder (local, no API key): `uv sync --extra semantic`, then once `python -m nanobot.context_graph.embed` to download the model (it prints a similarity sample: "car" vs "automobile" scores about 0.78, "car" vs "banana" about 0.04). The OpenCode Zen provider documents no embeddings endpoint, so the model runs locally.
 
 Per-session commands: `/context hybrid archived|family|default` (override the pool; `default` clears it), `/context summary <from> <to> <text>` (summarise messages `from..to` of this session; used only when those messages are not replayed), `/context summary` (list), `/context summary clear`. Message numbers are the node numbers shown in the WebUI chat tree. The tree marks what the last turn used (vector / summary / in context).
 

@@ -10,9 +10,10 @@ from nanobot.session import Session
 from nanobot.utils.helpers import estimate_message_tokens, truncate_text_to_tokens
 
 from .derive import SessionLoader, build_session_graph
-from .embed import Embedder, HashEmbedder
+from .embed import Embedder, make_embedder
 from .model import EdgeType, NodeId
 from .observability import ContextResult
+from .prune import prune_by_relevance
 from .recall import pool_candidates, recall
 from .resolver import get_ancestor_context
 from .summaries import usable_summaries
@@ -45,8 +46,8 @@ class GraphContextEngine:
         self.list_sessions: Callable[[], Sequence[Mapping[str, Any]]] = (
             list_sessions or (lambda: ())
         )
-        self.embedder: Embedder = embedder or HashEmbedder()
         self.config = config or ContextGraphConfig()
+        self.embedder: Embedder = embedder or make_embedder(self.config)
 
     def build_context(
         self,
@@ -66,7 +67,10 @@ class GraphContextEngine:
             "max_tokens": max_tokens,
             "extend_to_user": extend_to_user,
         }
-        if hybrid and max_tokens:  # leave room for the recalled block
+        budget = self.config.graph_token_budget
+        if budget > 0:  # a dedicated history budget; the recalled block has its own cap
+            history_args["max_tokens"] = min(budget, max_tokens) if max_tokens else budget
+        elif hybrid and max_tokens:  # leave room for the recalled block
             history_args["max_tokens"] = max_tokens - min(
                 self.config.recall_token_budget, max_tokens // 2
             )
@@ -76,6 +80,8 @@ class GraphContextEngine:
         fallback: str | None = None
         recalled = ""
         recall_info: dict[str, Any] = {}
+        prune_info: dict[str, Any] = {}
+        relevance: dict[NodeId, float] = {}
         try:
             graph, tip, sessions = build_session_graph(session, self.load_session)
             nodes, node_reasons = get_ancestor_context(graph, tip) if tip is not None else ([], {})
@@ -87,6 +93,22 @@ class GraphContextEngine:
                 for k, i in nodes
                 if i >= sessions[k].last_archived and not sessions[k].messages[i].get("_command")
             ]
+            if budget > 0 and replayable:
+                try:
+                    pruned = prune_by_relevance(
+                        [sessions[k].messages[i] for k, i in replayable],
+                        query or "",
+                        self.embedder,
+                        budget=history_args["max_tokens"],
+                        keep_recent_turns=self.config.keep_recent_turns,
+                    )
+                    if pruned is not None:
+                        relevance = {replayable[j]: s for j, s in pruned.scores.items()}
+                        prune_info["pruned_by_relevance"] = len(replayable) - len(pruned.kept)
+                        replayable = [replayable[j] for j in pruned.kept]
+                except Exception as exc:  # pruning is an optimisation: keep the turn
+                    logger.warning("Relevance pruning skipped: {}", exc)
+                    prune_info["prune_error"] = f"{type(exc).__name__}: {exc}"
             replay = Session(
                 key=session.key,
                 messages=[sessions[k].messages[i] for k, i in replayable],
@@ -96,7 +118,12 @@ class GraphContextEngine:
                 raise ValueError("graph produced no legal replay")
             kept = replayable[len(replayable) - len(history) :] if history else []
             node_ids = [f"{k}#{i}" for k, i in kept]
-            reasons = {f"{k}#{i}": node_reasons[(k, i)] for k, i in kept}
+            reasons = {
+                f"{k}#{i}": f"relevance (score {relevance[(k, i)]:.2f})"
+                if (k, i) in relevance
+                else node_reasons[(k, i)]
+                for k, i in kept
+            }
             node_set = set(nodes)
             branch_count = sum(
                 1 for e in graph.edges if e.type is EdgeType.BRANCH and e.target in node_set
@@ -125,6 +152,8 @@ class GraphContextEngine:
                 "pruned": max(visited - len(history), 0),
                 "branch_count": branch_count,
                 "fallback": fallback,
+                **({"graph_budget": budget, "embedder": getattr(self.embedder, "name", "custom")} if budget > 0 else {}),
+                **prune_info,
                 **recall_info,
             },
         )
@@ -142,7 +171,7 @@ class GraphContextEngine:
     ) -> tuple[str, dict[str, Any]]:
         """Summaries and similar messages that are not in the replay. Never raises."""
         pool = pool or self.config.semantic_pool
-        info: dict[str, Any] = {"pool": pool}
+        info: dict[str, Any] = {"pool": pool, "embedder": getattr(self.embedder, "name", "custom")}
         started = time.perf_counter()
         text = ""
         try:
@@ -167,7 +196,11 @@ class GraphContextEngine:
                 [(n, m) for n, m in candidates if n not in covered],
                 self.embedder,
                 top_k=cfg.semantic_top_k,
-                min_score=cfg.semantic_min_score,
+                min_score=(
+                    cfg.semantic_min_score
+                    if cfg.semantic_min_score is not None
+                    else getattr(self.embedder, "default_min_score", 0.15)
+                ),
             )
             info["semantic_hits"] = len(hits)
 

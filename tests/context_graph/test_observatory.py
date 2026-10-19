@@ -171,3 +171,29 @@ def test_a_compacted_chat_followed_by_command_turns_compares_without_fallback():
     assert dto["strategies"]["graph"]["nodes"] == 0  # nothing left to replay, and that is not an error
     assert ids(dto, "hybrid") == {"cli:c#0", "cli:c#1"}  # recall brings the archived exchange back
     assert ids(dto, "linear") == {"cli:c#0", "cli:c#1"}  # linear keeps a short archived tail
+
+
+def test_budget_pruning_and_the_embedder_are_reported():
+    s = Session(key="cli:c")
+    for i in range(6):
+        s.add_message("user", f"small talk number {i} about fruit")
+        s.add_message("assistant", f"bananas are berries and tomatoes are fruit {i}")
+    s.add_message("user", "Which database should the orders service use?")
+    s.add_message("assistant", "We decided on Postgres as the database for the orders service.")
+    for i in range(3):
+        s.add_message("user", f"more small talk {i} about the weather")
+        s.add_message("assistant", f"sunny with clouds {i}")
+    s.metadata["_last_turn"] = {
+        "strategy": "graph", "at": len(s.messages), "max_tokens": 100_000,
+        "graph_config": ContextGraphConfig(
+            graph_token_budget=120, keep_recent_turns=2, semantic_embedder="hash"
+        ).model_dump(),
+    }
+    s.add_message("user", "which database did we pick for the orders service")
+    dto = observe(s)
+    graph, linear = dto["strategies"]["graph"], dto["strategies"]["linear"]
+    assert graph["pruned"] > 0 and graph["embedder"] == "hash"
+    assert graph["tokens"] < linear["tokens"] and graph["nodes"] < linear["nodes"]
+    row = next(n for n in dto["nodes"] if n["id"] == "cli:c#13")  # the assistant's Postgres answer
+    assert row["in"]["graph"] and row["reason"]["graph"].startswith("relevance (score ")
+    assert linear.get("pruned", 0) == 0 and "embedder" not in linear

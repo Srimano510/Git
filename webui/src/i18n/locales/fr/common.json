@@ -1403,6 +1403,8 @@
       "tokens": "{{count}} tokens",
       "ms": "{{value}} ms",
       "recalled": "{{count}} rappelés",
+      "pruned": "{{count}} écartés par pertinence",
+      "embedder": "Plongement : {{name}}",
       "onlyIn": "{{count}} uniquement ici",
       "fallback": "Repli : {{reason}}",
       "timing": "Durées (mesurées sur la reconstruction)",

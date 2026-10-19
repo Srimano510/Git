@@ -1417,6 +1417,8 @@
       "tokens": "{{count}} tokens",
       "ms": "{{value}} ms",
       "recalled": "{{count}} recalled",
+      "pruned": "{{count}} pruned by relevance",
+      "embedder": "Embedder: {{name}}",
       "onlyIn": "{{count}} only here",
       "fallback": "Fell back: {{reason}}",
       "timing": "Timing (measured on the rebuild)",

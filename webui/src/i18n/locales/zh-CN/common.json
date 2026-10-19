@@ -1417,6 +1417,8 @@
       "tokens": "{{count}} 个 token",
       "ms": "{{value}} 毫秒",
       "recalled": "召回 {{count}} 条",
+      "pruned": "按相关性剔除 {{count}} 条",
+      "embedder": "嵌入器：{{name}}",
       "onlyIn": "仅此处 {{count}} 条",
       "fallback": "已回退：{{reason}}",
       "timing": "耗时（在重建时测得）",

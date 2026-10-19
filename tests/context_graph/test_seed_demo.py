@@ -35,3 +35,32 @@ def test_seed_refuses_to_run_twice_and_needs_a_workspace(tmp_path, capsys):
         main([str(ws)])
     with pytest.raises(SystemExit):
         main([])
+
+
+# --- Phase 7: the "selective" half of the claim ------------------------------------------------
+
+
+def test_noise_scenario_meets_the_pass_criteria_for_complete_and_selective(tmp_path):
+    """Criteria fixed before the scenario was built (docs/PHASES7-11-PLAN.md, 4.3):
+    graph and hybrid find at least as many relevant messages as linear, with strictly
+    fewer unrelated messages and no more tokens."""
+    from scripts.seed_demo import NOISE, measure, seed_noise
+
+    manager = SessionManager(tmp_path / "ws", sessions_root=tmp_path / "files")
+    relevant = seed_noise(manager)
+    m = measure(manager, NOISE, relevant)
+
+    assert m["linear"]["relevant"] == len(relevant)  # linear replays everything, so it has them all
+    for name in ("graph", "hybrid"):
+        assert m[name]["relevant"] >= m["linear"]["relevant"], name
+        assert m[name]["noise"] < m["linear"]["noise"], name
+        assert m[name]["tokens"] <= m["linear"]["tokens"], name
+    assert m["graph"]["pruned"] > 0  # the saving comes from relevance pruning, not luck
+
+
+def test_scenarios_refuse_to_run_twice_and_both_can_share_a_workspace(tmp_path):
+    ws = tmp_path / "ws"
+    assert main([str(ws)]) == 0  # default: both scenarios
+    with pytest.raises(SystemExit):
+        main([str(ws), "--scenario", "noise"])
+    assert main([str(tmp_path / "ws2"), "--scenario", "noise", "--report"]) == 0

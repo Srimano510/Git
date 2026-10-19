@@ -130,3 +130,36 @@ def test_graph_strategy_output_is_unchanged_by_the_hybrid_arguments_being_absent
     a = GraphContextEngine().build_context(s, max_tokens=100_000)
     b = engine().build_context(s, max_tokens=100_000, query="orders", hybrid=False)
     assert a.messages == b.messages and b.recalled == "" and b.diagnostics["phase"] == 3
+
+
+# --- the recall cut-off follows the embedder (dense models score unrelated text higher) -------
+
+
+class Scored:
+    """Embedder with a chosen similarity per text: one relevant message, the rest 'noise'."""
+
+    def __init__(self, default_min_score):
+        self.name = "scored"
+        self.default_min_score = default_min_score
+
+    def embed(self, text):
+        # query and the Postgres message share axis 0; all other texts sit at cosine 0.2 to the query
+        if "orders" in text:
+            return {0: 1.0}
+        return {0: 0.2, 1: 0.9797958971132712}
+
+
+def test_recall_cutoff_defaults_to_the_embedders_own_value():
+    s = make_session(archived=18)
+    q = "orders database"
+    strict = GraphContextEngine(config=CFG, embedder=Scored(0.3)).build_context(s, query=q, hybrid=True)
+    loose = GraphContextEngine(config=CFG, embedder=Scored(0.1)).build_context(s, query=q, hybrid=True)
+    assert strict.diagnostics["semantic_included"] == 2  # only the two 'orders' messages clear 0.3
+    assert loose.diagnostics["semantic_included"] == CFG.semantic_top_k  # noise at 0.2 clears 0.1
+
+
+def test_an_explicit_min_score_beats_the_embedders_default():
+    s = make_session(archived=18)
+    cfg = ContextGraphConfig(semantic_min_score=0.1)
+    out = GraphContextEngine(config=cfg, embedder=Scored(0.3)).build_context(s, query="orders database", hybrid=True)
+    assert out.diagnostics["semantic_included"] == cfg.semantic_top_k

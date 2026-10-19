@@ -15,7 +15,10 @@ const payload: ObservatoryPayload = {
   query: "Which database do we use?",
   strategies: {
     linear: { nodes: 3, tokens: 40, ms: 0.2, fallback: null, timing: timing(0.2, 0) },
-    graph: { nodes: 2, tokens: 30, ms: 1.5, fallback: null, timing: timing(1.5, 0) },
+    graph: {
+      nodes: 2, tokens: 30, ms: 1.5, fallback: null, timing: timing(1.5, 0),
+      pruned: 5, embedder: "model2vec",
+    },
     hybrid: {
       nodes: 3, tokens: 55, ms: 3.1, fallback: "RuntimeError: boom",
       timing: timing(1.6, 1.5), recalled: 1, summaries: 0,
@@ -74,6 +77,11 @@ describe("ContextObservatory", () => {
     expect(hybrid).toHaveTextContent("used for this turn");
     expect(hybrid).toHaveTextContent("RuntimeError: boom");
     expect(screen.getByTestId("observatory-card-graph")).not.toHaveTextContent("used for this turn");
+    const graph = screen.getByTestId("observatory-card-graph");
+    expect(graph).toHaveTextContent("5 pruned by relevance");
+    expect(graph).toHaveTextContent("Embedder: model2vec");
+    expect(screen.getByTestId("observatory-card-linear")).not.toHaveTextContent("pruned");
+    expect(screen.getByTestId("observatory-card-linear")).not.toHaveTextContent("Embedder");
     expect(screen.getByTestId("observatory-card-linear")).toHaveTextContent("40 tokens");
     expect(screen.getByTestId("observatory-timing-hybrid")).toHaveTextContent("1.5");
     expect(screen.getByText(/Which database do we use\?/)).toBeInTheDocument();

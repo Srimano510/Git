@@ -1403,6 +1403,8 @@
       "tokens": "토큰 {{count}}개",
       "ms": "{{value}} ms",
       "recalled": "{{count}}개 회상",
+      "pruned": "관련성으로 {{count}}개 제외",
+      "embedder": "임베더: {{name}}",
       "onlyIn": "여기에만 {{count}}개",
       "fallback": "폴백: {{reason}}",
       "timing": "타이밍(재구성 시 측정)",

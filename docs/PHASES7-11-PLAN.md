@@ -1,6 +1,6 @@
 # Phases 7 to 11 plan: from "more complete" to "complete AND selective", plus a demo kit
 
-Status: **PLANNED 2026-10-19, decisions recorded, waiting for owner approval to implement.** No code changed.
+Status: **Phase 7 IMPLEMENTED 2026-10-19 on branch `phase7` (as-built notes in section 10); Phases 8 to 11 planned, waiting for approval.**
 Branch for planning: `phase7`. Each phase gets its own branch (`phase7` ... `phase11`) and its own commit(s) by the owner. Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Everything below either *proves* the claim, *removes a known gap*, or *makes the demo safe*.
 
 ## 1. Project goals (owner answers, 2026-10-19)
@@ -188,3 +188,47 @@ Things I suggest adding to demonstrate the goal best (all inside the tasks above
 - **The free Zen period can end** and free models rotate; `demo.md` names how to list current models and falls back to the mock. Model ids in this plan are not hard-coded.
 - **Machine-translated labels** keep growing in 9 locales; same caveat as before.
 - **Scope honesty for the slides:** even after Phase 7, the claim is about the scripted demo chats, not about every real conversation.
+
+## 10. Phase 7 as built (differences, measurements and findings)
+
+**Built as planned:** `context_graph/embed.py` (`Model2VecEmbedder`, `make_embedder`, `python -m nanobot.context_graph.embed` prefetch), `context_graph/prune.py` (`split_turns`, `prune_by_relevance`), engine integration (`graph_token_budget`, `keep_recent_turns`, relevance reasons, `pruned_by_relevance`, `prune_error`, `graph_budget`, `embedder` diagnostics), config fields, Observatory (`pruned`, `embedder` per strategy, "N pruned by relevance", "Embedder: ..." in 10 locales), `seed_demo.py` with the `noise` scenario and `measure`, `pyproject.toml` optional extra `semantic = ["model2vec>=0.10.0"]`.
+
+**Verified before coding (P7-1):** model2vec 0.10.0 and `minishlab/potion-base-8M` (256 dimensions, about 30 MB, 200 short encodes in 1.6 ms). "car" vs "automobile" 0.78, "car" vs "banana" 0.04; "database for the orders service" vs "we chose Postgres to store orders" 0.54, vs unrelated text 0.10. The hashed embedder scores the first pair 0.
+
+**Differences from the plan**
+- **Per-embedder recall cut-off (not planned).** `semanticMinScore` is now unset by default and each embedder carries its own (`hash` 0.15, `model2vec` 0.30). Measured with the real model: unrelated messages score up to 0.21 (noise scenario) and 0.17 (merge scenario), relevant ones from 0.39; with the old 0.15 the dense model let 5 of 28 noise messages (11 of 12 in the merge demo) through and hybrid carried 3 irrelevant recalled messages. An explicit config value still wins.
+- **Model files:** `snapshot_download` is limited to the three files a static model needs (`config.json`, `model.safetensors`, `tokenizer.json`); without that the local-only check called the cache "incomplete".
+- **Cache location:** `<data dir>/models/hub`. The data dir follows the active config (`~/.nanobot` for the default config), so each instance has its own copy.
+- **No env-var override:** the root `conftest.py` already redirects the data dir per test, so tests never see a real model; "auto" falls back to hashed words there.
+- **Budget semantics:** `graphTokenBudget` is the *history* budget for graph and hybrid; the recalled block keeps its own cap, so hybrid can exceed it by at most `recallTokenBudget`.
+
+**Pass criteria (fixed before building, section 4.3) and results.** Noise scenario: 16 turns, the two relevant ones first (4 messages), 14 small-talk turns; final question needs both facts. Linear replays all 32 messages (471 tokens).
+
+| | nodes | tokens | relevant | unrelated |
+|---|---:|---:|---:|---:|
+| linear | 32 | 471 | 4 / 4 | 28 |
+| graph, budget 200 | 12 | 190 | 4 / 4 | 8 |
+| hybrid, budget 200 | 12 | 190 | 4 / 4 | 8 |
+
+Criteria met: graph and hybrid find at least as many relevant messages as linear, with strictly fewer unrelated messages and fewer tokens (60% fewer tokens, 20 fewer unrelated messages). Enforced by `test_noise_scenario_meets_the_pass_criteria_for_complete_and_selective` (hashed embedder in the test environment) and re-measured with the real model.
+
+**Budget sweep (so the result does not hinge on one number).** Tokens graph / hybrid / linear, relevant found graph / hybrid / linear, unrelated graph / hybrid / linear:
+
+| budget | model2vec tokens | relevant | unrelated | hashed words: relevant |
+|---:|---|---|---|---|
+| 100 | 97 / 170 / 471 | 2 / 4 / 4 | 4 / 4 / 28 | 2 / 4 / 4 |
+| 150 | 132 / 132 / 471 | 4 / 4 / 4 | 4 / 4 / 28 | 4 / 4 / 4 |
+| 200 | 190 / 190 / 471 | 4 / 4 / 4 | 8 / 8 / 28 | 4 / 4 / 4 |
+| 300 | 299 / 299 / 471 | 4 / 4 / 4 | 16 / 16 / 28 | 4 / 4 / 4 |
+| 400 | 379 / 379 / 471 | 4 / 4 / 4 | 22 / 22 / 28 | 4 / 4 / 4 |
+| 470 | 444 / 444 / 471 | 4 / 4 / 4 | 26 / 26 / 28 | 4 / 4 / 4 |
+
+The claim holds at every budget from 150 up with both embedders. At 100 tokens, graph alone loses two relevant messages (the budget no longer fits the two protected recent turns plus both relevant turns) and hybrid's recall brings them back. **The demo budget (200) was chosen after this sweep** as about 40% of the full history; the first budget I wrote (350) also met the criteria but with a smaller saving. Below the total, the saving is directly the budget: unrelated messages drop in step with it.
+
+**Browser check (real gateway, mock LLM, real model2vec):** the noise chat's Observatory shows Linear 33 nodes / 489 tokens against Graph and Hybrid 11 nodes / 178 tokens, each with "22 pruned by relevance" and "Embedder: model2vec"; "Differences only" lists the small talk that only linear carries. A real hybrid turn sent 12 messages to the model (system + 10 history + current) against 32+ for linear; the request contained both facts and the newest turns and none of the middle small talk (Mount Elbrus, jazz, pasta, Canberra).
+
+**Findings and fixes along the way**
+- **Latent bug (fixed, regression test):** `Config.model_validate(...)` skipped the lazy tool-config resolution that only `__init__` had, so a process that imported `nanobot.context_graph` before `nanobot.config.schema` failed with "Config is not fully defined". `Config` now has the same guard on `model_validate`.
+- **`uv sync` side effects:** the first `uv add` could not finish because the owner's running gateway holds `.venv\Scripts\nanobot.exe`; it rolled back cleanly. The extra was added with `uv add --no-sync` and installed with `uv sync --extra semantic --no-install-project --inexact`, which does not touch the running executable. The sync also moved `websockets` from 15.0.1 to 16.1.1, the version the (git-ignored) `uv.lock` pins; the full suite passes with it. `uv.lock` is git-ignored in this repository, so only `pyproject.toml` changes.
+- **Types:** `huggingface_hub.snapshot_download` has partly unknown overload types under `basedpyright` strict, so it is reached through `importlib` as `Any`.
+- **Caveat on what the demo proves:** turns are split at user messages, so a relevant fact stated mid-turn travels with its whole turn; and the pass criteria are about scripted chats, not every conversation.

@@ -1403,6 +1403,8 @@
       "tokens": "{{count}} トークン",
       "ms": "{{value}} ms",
       "recalled": "{{count}} 件を想起",
+      "pruned": "関連性で {{count}} 件を除外",
+      "embedder": "埋め込み: {{name}}",
       "onlyIn": "ここだけ {{count}} 件",
       "fallback": "フォールバック: {{reason}}",
       "timing": "タイミング（再構築時に計測）",

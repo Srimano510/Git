@@ -110,6 +110,9 @@ def build_observatory(
                     timing=(result.retrieval_ms - vector, vector),
                     fallback=diag.get("fallback") or diag.get("semantic_error"),
                 )
+                info["pruned"] = int(diag.get("pruned_by_relevance") or 0)
+                if diag.get("embedder"):
+                    info["embedder"] = diag["embedder"]
                 if name == "hybrid":
                     info["recalled"] = int(diag.get("semantic_included") or 0)
                     info["summaries"] = int(diag.get("summaries_used") or 0)
