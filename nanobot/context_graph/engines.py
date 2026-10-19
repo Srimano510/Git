@@ -80,7 +80,13 @@ class GraphContextEngine:
             graph, tip, sessions = build_session_graph(session, self.load_session)
             nodes, node_reasons = get_ancestor_context(graph, tip) if tip is not None else ([], {})
             visited = len(nodes)
-            replayable = [(k, i) for k, i in nodes if i >= sessions[k].last_archived]
+            # Slash-command turns never reach the model; leaving them out keeps ``kept`` aligned
+            # with the history and lets an all-command replay be empty instead of a "failure".
+            replayable = [
+                (k, i)
+                for k, i in nodes
+                if i >= sessions[k].last_archived and not sessions[k].messages[i].get("_command")
+            ]
             replay = Session(
                 key=session.key,
                 messages=[sessions[k].messages[i] for k, i in replayable],

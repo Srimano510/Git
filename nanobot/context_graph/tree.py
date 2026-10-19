@@ -151,16 +151,13 @@ def _without_commands(
     return edges, nodes - skip, {k: visible_tip(t) for k, t in tips.items()}
 
 
-def _workflow(session: Session, shown: set[str]) -> dict[str, Any] | None:
-    """The last turn's workflow trace, hung off the user message it was built for."""
-    wf = cast(object, session.metadata.get("_last_workflow"))
-    if not isinstance(wf, dict):
-        return None
-    record = cast(dict[str, Any], wf)
-    at = record.get("at")
-    if not isinstance(at, int) or not record.get("nodes"):
-        return None
-    anchor = next(
+def turn_anchor(session: Session, at: int) -> str | None:
+    """Node id of the user message a turn recorded at message count ``at`` belongs to.
+
+    The user message is persisted after the context is built, so it is the first visible
+    user message at index ``at`` or later.
+    """
+    return next(
         (
             _node_id((session.key, i))
             for i in range(at, len(session.messages))
@@ -170,6 +167,18 @@ def _workflow(session: Session, shown: set[str]) -> dict[str, Any] | None:
         ),
         None,
     )
+
+
+def _workflow(session: Session, shown: set[str]) -> dict[str, Any] | None:
+    """The last turn's workflow trace, hung off the user message it was built for."""
+    wf = cast(object, session.metadata.get("_last_workflow"))
+    if not isinstance(wf, dict):
+        return None
+    record = cast(dict[str, Any], wf)
+    at = record.get("at")
+    if not isinstance(at, int) or not record.get("nodes"):
+        return None
+    anchor = turn_anchor(session, at)
     if anchor is None or anchor not in shown:
         return None
     first = record["nodes"][0]["id"]

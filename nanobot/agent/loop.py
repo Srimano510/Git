@@ -104,7 +104,7 @@ from nanobot.session.summary import (
 from nanobot.triggers.local_turns import LocalTriggerTurnCoordinator
 from nanobot.utils.cancellation import task_is_cancelling
 from nanobot.utils.document import reference_non_image_attachments
-from nanobot.utils.helpers import image_placeholder_text
+from nanobot.utils.helpers import estimate_message_tokens, image_placeholder_text
 from nanobot.utils.helpers import truncate_text as truncate_text_fn
 from nanobot.utils.llm_runtime import LLMRuntime
 from nanobot.utils.runtime import (
@@ -760,6 +760,40 @@ class AgentLoop:
         if query is not None:  # subagent turns have no user message to anchor the trace to
             session.metadata["_last_workflow"] = build_workflow(result, len(session.messages))
         return result
+
+    def _turn_history(
+        self, session: Session, query: str, is_subagent: bool
+    ) -> tuple[list[dict[str, Any]], ContextResult | None]:
+        """History for the session's strategy; records the turn for the Observatory and logs it."""
+        strategy = (session.metadata.get("context_strategy") or "linear").strip().lower()
+        started = time.perf_counter()
+        result: ContextResult | None = None
+        if strategy in {"graph", "context_graph", "hybrid"}:
+            result = self._graph_context(
+                session, strategy, None if is_subagent else query, is_subagent
+            )
+            history = result.messages
+        else:
+            history = session.get_history(extend_to_user=is_subagent)
+        name = result.strategy if result else "linear"
+        if not is_subagent:
+            # The Observatory rebuilds every strategy from the chat as it was before this turn.
+            session.metadata["_last_turn"] = {
+                "strategy": name,
+                "at": len(session.messages),
+                "max_tokens": self.context_window_tokens,
+                "graph_config": self.context_graph_config.model_dump(),
+            }
+        recall = f" recall={result.diagnostics.get('semantic_hits', 0)}" if name == "hybrid" and result else ""
+        logger.info(
+            "Context strategy={} nodes={} tokens={} ms={:.1f}{}",
+            name,
+            len(history),
+            sum(estimate_message_tokens(m) for m in history),
+            (time.perf_counter() - started) * 1000,
+            recall,
+        )
+        return history, result
 
     def _build_transcript_input(self, ctx: TurnContext) -> TranscriptInput:
         """Capture the persisted history and fresh input as separate transcript parts."""
@@ -1939,18 +1973,7 @@ class AgentLoop:
             session = ctx.require_session()
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
-        strategy = (session.metadata.get("context_strategy") or "linear").strip().lower()
-        if strategy in {"graph", "context_graph", "hybrid"}:
-            context_result = self._graph_context(
-                session,
-                strategy,
-                None if is_subagent else ctx.msg.content,
-                is_subagent,
-            )
-            ctx.context_result = context_result
-            ctx.history = context_result.messages
-        else:
-            ctx.history = session.get_history(extend_to_user=is_subagent)
+        ctx.history, ctx.context_result = self._turn_history(session, ctx.msg.content, is_subagent)
         stored_state = session.provider_state
         subagent_followup_persisted = False
         if is_subagent:

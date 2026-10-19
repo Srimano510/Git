@@ -1788,17 +1788,23 @@ const composer = (
     {t("thread.chatTree.open")}
   </button>
 ) : null}
-<button
-  onClick={() => setObsOpen(true)}
-  className="fixed bottom-24 right-4 z-30 rounded-full border bg-background px-3 py-2 text-xs text-foreground shadow"
->
-  Context
-</button>
-<ContextObservatory
-  open={obsOpen}
-  onClose={() => setObsOpen(false)}
-  sessionKey="current"
-/>
+{historyKey ? (
+  <>
+    <button
+      onClick={() => setObsOpen(true)}
+      className="fixed bottom-24 right-4 z-30 rounded-full border bg-background px-3 py-2 text-xs text-foreground shadow"
+    >
+      {t("thread.observatory.open")}
+    </button>
+    <ContextObservatory
+      open={obsOpen}
+      onClose={() => setObsOpen(false)}
+      token={token}
+      sessionKey={historyKey}
+      refreshKey={displayMessages.length}
+    />
+  </>
+) : null}
     </>
   );
   const emptyState = loading ? (

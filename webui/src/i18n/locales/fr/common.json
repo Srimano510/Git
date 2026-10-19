@@ -1384,6 +1384,37 @@
       "strategyHybrid": "Hybride (graphe + vectoriel)",
       "strategyTooltip": "Changer la stratégie de contexte"
     },
+    "observatory": {
+      "title": "Observatoire du contexte",
+      "open": "Contexte",
+      "close": "Fermer",
+      "loading": "Chargement du contexte…",
+      "empty": "Envoyez un message pour voir comment le contexte a été construit.",
+      "error": "Impossible de charger le contexte : {{message}}",
+      "query": "Dernier message : {{text}}",
+      "reconstructed": "Reconstruit à partir de la conversation telle qu'elle était avant le dernier tour. Un compactage ultérieur peut le faire différer de ce que le modèle a reçu.",
+      "strategy": {
+        "linear": "Linéaire",
+        "graph": "Graphe",
+        "hybrid": "Hybride"
+      },
+      "used": "utilisé pour ce tour",
+      "nodes": "{{count}} nœuds",
+      "tokens": "{{count}} tokens",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}} rappelés",
+      "onlyIn": "{{count}} uniquement ici",
+      "fallback": "Repli : {{reason}}",
+      "timing": "Durées (mesurées sur la reconstruction)",
+      "traversal": "parcours",
+      "vector": "vecteur",
+      "total": "total",
+      "diffOnly": "Différences uniquement",
+      "colNode": "Nœud",
+      "colExcerpt": "Extrait",
+      "colTokens": "Tokens",
+      "colReason": "Raison"
+    },
     "promptNavigator": {
       "open": "Ouvrir le navigateur d’instructions",
       "title": "Instructions",

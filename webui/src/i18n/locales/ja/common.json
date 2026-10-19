@@ -1384,6 +1384,37 @@
       "strategyHybrid": "ハイブリッド (グラフ + ベクトル)",
       "strategyTooltip": "コンテキスト戦略を変更"
     },
+    "observatory": {
+      "title": "コンテキスト・オブザーバトリー",
+      "open": "コンテキスト",
+      "close": "閉じる",
+      "loading": "コンテキストを読み込み中…",
+      "empty": "メッセージを送信すると、コンテキストの構築過程が表示されます。",
+      "error": "コンテキストを読み込めませんでした: {{message}}",
+      "query": "直前のメッセージ: {{text}}",
+      "reconstructed": "直前のターンより前のチャットから再構築したものです。その後の圧縮により、モデルが受け取った内容と異なる場合があります。",
+      "strategy": {
+        "linear": "リニア",
+        "graph": "グラフ",
+        "hybrid": "ハイブリッド"
+      },
+      "used": "このターンで使用",
+      "nodes": "{{count}} ノード",
+      "tokens": "{{count}} トークン",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}} 件を想起",
+      "onlyIn": "ここだけ {{count}} 件",
+      "fallback": "フォールバック: {{reason}}",
+      "timing": "タイミング（再構築時に計測）",
+      "traversal": "走査",
+      "vector": "ベクトル",
+      "total": "合計",
+      "diffOnly": "差分のみ",
+      "colNode": "ノード",
+      "colExcerpt": "抜粋",
+      "colTokens": "トークン",
+      "colReason": "理由"
+    },
     "promptNavigator": {
       "open": "プロンプトナビゲーターを開く",
       "title": "プロンプト",

@@ -1384,6 +1384,37 @@
       "strategyHybrid": "混合（圖 + 向量）",
       "strategyTooltip": "變更上下文策略"
     },
+    "observatory": {
+      "title": "上下文觀測台",
+      "open": "上下文",
+      "close": "關閉",
+      "loading": "正在載入上下文…",
+      "empty": "傳送一則訊息，即可查看上下文是如何建構的。",
+      "error": "無法載入上下文：{{message}}",
+      "query": "最後一則訊息：{{text}}",
+      "reconstructed": "根據上一輪之前的聊天狀態重建。之後的壓縮可能使其與模型實際收到的內容不同。",
+      "strategy": {
+        "linear": "線性",
+        "graph": "圖",
+        "hybrid": "混合"
+      },
+      "used": "本輪使用",
+      "nodes": "{{count}} 個節點",
+      "tokens": "{{count}} 個 token",
+      "ms": "{{value}} 毫秒",
+      "recalled": "召回 {{count}} 則",
+      "onlyIn": "僅此處 {{count}} 則",
+      "fallback": "已回退：{{reason}}",
+      "timing": "耗時（於重建時量測）",
+      "traversal": "走訪",
+      "vector": "向量",
+      "total": "合計",
+      "diffOnly": "僅顯示差異",
+      "colNode": "節點",
+      "colExcerpt": "摘錄",
+      "colTokens": "Token",
+      "colReason": "原因"
+    },
     "promptNavigator": {
       "open": "開啟提示詞導覽",
       "title": "提示詞",

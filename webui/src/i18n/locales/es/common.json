@@ -1385,6 +1385,37 @@
       "strategyHybrid": "Híbrido (grafo + vectorial)",
       "strategyTooltip": "Cambiar estrategia de contexto"
     },
+    "observatory": {
+      "title": "Observatorio de contexto",
+      "open": "Contexto",
+      "close": "Cerrar",
+      "loading": "Cargando contexto…",
+      "empty": "Envía un mensaje para ver cómo se construyó el contexto.",
+      "error": "No se pudo cargar el contexto: {{message}}",
+      "query": "Último mensaje: {{text}}",
+      "reconstructed": "Reconstruido a partir del chat tal como estaba antes del último turno. La compactación posterior puede hacer que difiera de lo que recibió el modelo.",
+      "strategy": {
+        "linear": "Lineal",
+        "graph": "Grafo",
+        "hybrid": "Híbrido"
+      },
+      "used": "usado en este turno",
+      "nodes": "{{count}} nodos",
+      "tokens": "{{count}} tokens",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}} recuperados",
+      "onlyIn": "{{count}} solo aquí",
+      "fallback": "Recurrió a: {{reason}}",
+      "timing": "Tiempos (medidos en la reconstrucción)",
+      "traversal": "recorrido",
+      "vector": "vector",
+      "total": "total",
+      "diffOnly": "Solo diferencias",
+      "colNode": "Nodo",
+      "colExcerpt": "Extracto",
+      "colTokens": "Tokens",
+      "colReason": "Motivo"
+    },
     "promptNavigator": {
       "open": "Abrir el navegador de instrucciones",
       "title": "Instrucciones",

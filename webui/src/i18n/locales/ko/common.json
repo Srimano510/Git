@@ -1384,6 +1384,37 @@
       "strategyHybrid": "하이브리드 (그래프 + 벡터)",
       "strategyTooltip": "컨텍스트 전략 변경"
     },
+    "observatory": {
+      "title": "컨텍스트 관측소",
+      "open": "컨텍스트",
+      "close": "닫기",
+      "loading": "컨텍스트 불러오는 중…",
+      "empty": "메시지를 보내면 컨텍스트가 어떻게 구성되었는지 볼 수 있습니다.",
+      "error": "컨텍스트를 불러올 수 없습니다: {{message}}",
+      "query": "마지막 메시지: {{text}}",
+      "reconstructed": "마지막 턴 이전의 채팅 상태에서 다시 구성한 것입니다. 이후의 압축으로 모델이 받은 내용과 다를 수 있습니다.",
+      "strategy": {
+        "linear": "선형",
+        "graph": "그래프",
+        "hybrid": "하이브리드"
+      },
+      "used": "이번 턴에 사용됨",
+      "nodes": "노드 {{count}}개",
+      "tokens": "토큰 {{count}}개",
+      "ms": "{{value}} ms",
+      "recalled": "{{count}}개 회상",
+      "onlyIn": "여기에만 {{count}}개",
+      "fallback": "폴백: {{reason}}",
+      "timing": "타이밍(재구성 시 측정)",
+      "traversal": "순회",
+      "vector": "벡터",
+      "total": "합계",
+      "diffOnly": "차이만 보기",
+      "colNode": "노드",
+      "colExcerpt": "발췌",
+      "colTokens": "토큰",
+      "colReason": "이유"
+    },
     "promptNavigator": {
       "open": "프롬프트 탐색기 열기",
       "title": "프롬프트",
