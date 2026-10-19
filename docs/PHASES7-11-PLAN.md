@@ -1,6 +1,6 @@
 # Phases 7 to 11 plan: from "more complete" to "complete AND selective", plus a demo kit
 
-Status: **Phase 7 IMPLEMENTED 2026-10-19 on branch `phase7` (as-built notes in section 10); Phases 8 to 11 planned, waiting for approval.**
+Status: **Phases 7 and 8 IMPLEMENTED 2026-10-19 (as-built notes in sections 10 and 11); Phases 9 to 11 planned, waiting for approval.**
 Branch for planning: `phase7`. Each phase gets its own branch (`phase7` ... `phase11`) and its own commit(s) by the owner. Governing rule ([AGENTS.md](../AGENTS.md)): minimum code, reuse the existing structure; the typed-edge DAG stays the only new core idea. Everything below either *proves* the claim, *removes a known gap*, or *makes the demo safe*.
 
 ## 1. Project goals (owner answers, 2026-10-19)
@@ -232,3 +232,19 @@ The claim holds at every budget from 150 up with both embedders. At 100 tokens, 
 - **`uv sync` side effects:** the first `uv add` could not finish because the owner's running gateway holds `.venv\Scripts\nanobot.exe`; it rolled back cleanly. The extra was added with `uv add --no-sync` and installed with `uv sync --extra semantic --no-install-project --inexact`, which does not touch the running executable. The sync also moved `websockets` from 15.0.1 to 16.1.1, the version the (git-ignored) `uv.lock` pins; the full suite passes with it. `uv.lock` is git-ignored in this repository, so only `pyproject.toml` changes.
 - **Types:** `huggingface_hub.snapshot_download` has partly unknown overload types under `basedpyright` strict, so it is reached through `importlib` as `Any`.
 - **Caveat on what the demo proves:** turns are split at user messages, so a relevant fact stated mid-turn travels with its whole turn; and the pass criteria are about scripted chats, not every conversation.
+
+## 11. Phase 8 as built (differences and findings)
+
+**Built as planned:** `context_graph/links.py` (`add_link`, `list_links`, `remove_link`, `parse_node`, `MAX_LINKS = 20`), `/context link|links|unlink` in `cmd_context` (keys keep their case; errors are replies, nothing is stored on failure; the `/context` help lists them), the Tree link action, and the single toggle (the header `ContextStrategyBadge` and its props are gone; the composer one stays). The link action reuses `client.sendSystemCommand(chatId, "/context link <id>")`, the same transport as the strategy toggle: no new HTTP route.
+
+**Differences from the plan**
+- **Link mode instead of a banner button.** Selecting a Tree node normally *navigates* to that node's chat, which is the opposite of what linking needs. The Tree panel header got a **link mode** button: while on, clicking a message of another branch sends the command to the current chat and stays there. The chat's own history is faded and unclickable (it can only be a no-op or a cycle), linkable messages get blue rings, and the view re-frames to include them. The UI cannot read the command's reply, so after the command it refetches the tree and checks that the new `CONTEXT` edge exists ("Linked ..." or "Could not link (see the chat for the reason)"). The Tree draws `CONTEXT` edges dotted blue.
+- **Validation (all with a user-facing message, nothing stored):** unknown chat, message out of range, slash-command messages, a message into itself, duplicates, more than 20 links, and **cycles** (a new edge source -> target closes a cycle exactly when the target is already an ancestor of the source, checked through the source's own graph including its other links).
+
+**Found in the browser and fixed (regression test added)**
+- **Default target after other `/context` commands.** The default target was "the latest message", which is a `_command` message whenever the chat ends in command turns (every `/context ...` command leaves two). So `/context link` right after any other context command failed. The default is now the latest non-command message.
+- **Silent no-op in link mode** (clicking an already-linked or own-history message did nothing): now visibly disabled.
+
+**Verified (Playwright, temp gateway, real model2vec, mock LLM):** one strategy toggle on screen and none in the header; `/context links` and `/context unlink 1` replies; the Tree link mode (own history faded, branch ringed); "Linked ..." confirmation; the dotted `CONTEXT` edge; and after a *new turn* the branch's messages are in the graph context (`graph: relevance (score 0.68)` with the 200-token budget). A link affects future turns, so the Observatory for the previous turn correctly does not show it.
+
+**Hazard found for the demo (Phase 11):** the gateway **auto-compacts sessions idle for 15 minutes** (`agents.defaults.idleCompactAfterMinutes`, default 15). The seeded demo chats were compacted while I was away, which emptied graph's replay (`0 nodes`) and changed the Observatory's reconstruction. The demo config must set `idleCompactAfterMinutes: 0`, and Phase 9's recorded comparison removes the reconstruction drift for real turns.

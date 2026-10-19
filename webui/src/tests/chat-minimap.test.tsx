@@ -91,6 +91,121 @@ describe("ChatMinimap", () => {
     expect(screen.queryByRole("button", { name: /workflow/i })).toBeNull();
   });
 
+  describe("link mode", () => {
+    const OTHER = "websocket:other";
+    const otherId = (i: number) => `${OTHER}#${i}`;
+
+    /** The open chat (3 messages) and another branch (2 messages) that is not in its history. */
+    function twoBranches(withLink = false): TreePayload {
+      const base = chain(3);
+      const nodes = [
+        ...base.nodes,
+        ...[0, 1].map((i) => ({
+          id: otherId(i), session_key: OTHER, index: i, role: i % 2 ? "assistant" : "user",
+          preview: `other ${i}`, fork_before_user_index: i,
+        })),
+      ];
+      return {
+        ...base,
+        nodes,
+        edges: [
+          ...base.edges,
+          { source: otherId(0), target: otherId(1), type: "REPLY" },
+          ...(withLink ? [{ source: otherId(1), target: id(2), type: "CONTEXT" }] : []),
+        ],
+        tips: { [KEY]: id(2), [OTHER]: otherId(1) },
+      };
+    }
+
+    const clickNode = (nodeId: string) =>
+      fireEvent.click(document.querySelector(`[data-id="${nodeId}"]`) as HTMLElement);
+
+    it("offers the Link button only when the chat can be linked into", async () => {
+      stubGraph(twoBranches());
+      const { unmount } = render(
+        <ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />,
+      );
+      await screen.findAllByTestId("minimap-node");
+      expect(screen.queryByRole("button", { name: /link a message/i })).toBeNull();
+      unmount();
+
+      stubGraph(twoBranches());
+      render(
+        <ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onLink={async () => {}} onClose={() => {}} />,
+      );
+      expect(await screen.findByRole("button", { name: "Link a message into this chat" })).toBeInTheDocument();
+    });
+
+    it("sends the clicked node instead of navigating, and ignores the chat's own history", async () => {
+      stubGraph(twoBranches());
+      const onSelectNode = vi.fn();
+      const onLink = vi.fn(async () => {});
+      render(
+        <ChatMinimap token="t" sessionKey={KEY} onSelectNode={onSelectNode} onLink={onLink} onClose={() => {}} />,
+      );
+      await screen.findAllByTestId("minimap-node");
+      fireEvent.click(screen.getByRole("button", { name: "Link a message into this chat" }));
+      expect(screen.getByText(/Click a message from another branch/)).toBeInTheDocument();
+
+      // linkable messages look clickable; the chat's own history looks disabled
+      const flag = (nodeId: string) =>
+        document.querySelector(`[data-id="${nodeId}"] [data-linkable]`)?.getAttribute("data-linkable");
+      expect(flag(otherId(1))).toBe("true");
+      expect(flag(id(0))).toBe("false");
+
+      clickNode(id(0)); // part of this chat's own history: nothing to link
+      expect(onLink).not.toHaveBeenCalled();
+
+      clickNode(otherId(1));
+      await waitFor(() => expect(onLink).toHaveBeenCalledWith(expect.objectContaining({ id: otherId(1) })));
+      expect(onSelectNode).not.toHaveBeenCalled();
+    });
+
+    it("confirms a link that shows up in the refreshed tree", async () => {
+      const responses = [twoBranches(), twoBranches(true)];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true, status: 200, text: async () => "",
+          json: async () => responses.shift() ?? twoBranches(true),
+        })),
+      );
+      render(
+        <ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onLink={async () => {}} onClose={() => {}} />,
+      );
+      await screen.findAllByTestId("minimap-node");
+      fireEvent.click(screen.getByRole("button", { name: "Link a message into this chat" }));
+      clickNode(otherId(1));
+      expect(await screen.findByRole("status")).toHaveTextContent("Linked");
+      expect(screen.queryByText(/Click a message from another branch/)).toBeNull(); // mode ends
+    });
+
+    it("says so when the command did not create a link", async () => {
+      stubGraph(twoBranches()); // the refreshed tree still has no CONTEXT edge
+      render(
+        <ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onLink={async () => {}} onClose={() => {}} />,
+      );
+      await screen.findAllByTestId("minimap-node");
+      fireEvent.click(screen.getByRole("button", { name: "Link a message into this chat" }));
+      clickNode(otherId(1));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not link");
+    });
+
+    it("reports a command that failed to send", async () => {
+      stubGraph(twoBranches());
+      render(
+        <ChatMinimap
+          token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}}
+          onLink={async () => { throw new Error("system command timed out"); }}
+        />,
+      );
+      await screen.findAllByTestId("minimap-node");
+      fireEvent.click(screen.getByRole("button", { name: "Link a message into this chat" }));
+      clickNode(otherId(1));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not link");
+    });
+  });
+
   it("shows an error when the graph cannot be loaded", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => "" })));
     render(<ChatMinimap token="t" sessionKey={KEY} onSelectNode={() => {}} onClose={() => {}} />);
