@@ -2,7 +2,7 @@
 
 Everything below is new compared with upstream nanobot. The project goal ([AGENTS.md](../AGENTS.md)): show a different way of building LLM context. Instead of replaying one flat transcript, the agent can build its prompt from a **typed-edge DAG of the conversation** (branches, replies, links), optionally topped up with **semantic recall** and **summaries**. One toggle switches between the old and the new way, so the same question can be answered both ways and compared.
 
-Per-phase plans and decisions: [PHASE3-PLAN.md](PHASE3-PLAN.md), [PHASE3_5-PLAN.md](PHASE3_5-PLAN.md), [PHASE4-PLAN.md](PHASE4-PLAN.md). Open questions: [REVIEW-LATER.md](REVIEW-LATER.md). Status log: [../log.md](../log.md).
+Per-phase plans and decisions: [PHASE3-PLAN.md](PHASE3-PLAN.md), [PHASE3_5-PLAN.md](PHASE3_5-PLAN.md), [PHASE4-PLAN.md](PHASE4-PLAN.md), [PHASE5-PLAN.md](PHASE5-PLAN.md). Open questions: [REVIEW-LATER.md](REVIEW-LATER.md). Status log: [../log.md](../log.md).
 
 ## 1. The three context strategies
 
@@ -47,6 +47,12 @@ The toggle appears twice (chat header and composer); both share one state and th
 - Config (`~/.nanobot/config.json`): `contextGraph.semanticPool`, `semanticTopK`, `semanticMinScore`, `recallTokenBudget` (see [configuration.md](configuration.md#context-graph-experimental)).
 - Code: `nanobot/context_graph/embed.py`, `recall.py`, `summaries.py`, `engines.py`.
 
+### Phase 5: workflow DAG
+- After every `graph` or `hybrid` turn the chat records a small **workflow DAG** of the steps that built its context: strategy selection, graph traversal and semantic search (in parallel, `TRIGGERS` edges), context merge, prompt build, LLM call (`FEEDS` edges). Each step shows real numbers from that turn (nodes visited and pruned, search hits, token count, ms for the steps that are timed).
+- In the **Tree** panel, the **Workflow** button (flow icon in the panel header, only when a trace exists) draws these steps in violet under the user message of that turn. Last turn only; off by default.
+- The steps are an observability record, never chat messages: they are not stored in the transcript, and the context engine never follows their edge types, so they cannot reach the prompt.
+- Code: `nanobot/context_graph/workflow.py`, `tree.py` (`workflow` field of `GET /api/sessions/{key}/graph`), `ChatMinimap.tsx`.
+
 ## 3. Commands
 
 | Command | Effect |
@@ -63,7 +69,8 @@ The toggle appears twice (chat header and composer); both share one state and th
 2. Open **Tree**: one long chain. Fork from an early message, continue differently, and watch the two branches appear. Pick an earlier node and send from it to branch visually.
 3. Switch the chat to `graph` and ask something in the fork: the model sees its own ancestry, not the sibling's answers.
 4. For `hybrid`: make the old fact fall out of the replayed history (long chat, or compaction), switch to `hybrid`, and ask "which database did we choose for orders?". Open the tree: the old messages carry a "vector" badge; the model request contains the "[Recalled Context]" block.
-5. Add `/context summary 0 7 Early on we chose Postgres.`, shrink the budget, and see the summary used instead of the raw range ("summary" badge).
+5. After any `graph`/`hybrid` turn, open **Tree** and press the **Workflow** button to see how that turn's context was built (graph traversal and semantic search side by side, then merge, prompt, LLM call).
+6. Add `/context summary 0 7 Early on we chose Postgres.`, shrink the budget, and see the summary used instead of the raw range ("summary" badge).
 
 ## 5. How it was verified
 
@@ -76,4 +83,5 @@ The toggle appears twice (chat header and composer); both share one state and th
 - `graph` and `linear` look alike in short, unforked chats; the difference shows with forks, compaction and `hybrid`.
 - The `family` pool breaks branch isolation by design (opt-in).
 - The full side-by-side Observatory (linear vs graph vs hybrid) is Phase 6; Phase 4 only marks recalled nodes in the tree.
-- Not implemented yet: Phase 5 (workflow DAG, optional), split windows, `/context link`.
+- The workflow DAG is a record made after the context step, not something the agent runs from. It keeps the last turn only, and `PromptBuild` and `LLMCall` have no duration (no timing was added to the agent loop).
+- Not implemented yet: split windows, `/context link`.

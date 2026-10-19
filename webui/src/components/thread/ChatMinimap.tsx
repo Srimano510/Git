@@ -14,7 +14,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Map as MapIcon, Maximize2, Minimize2, X } from "lucide-react";
+import { Map as MapIcon, Maximize2, Minimize2, Workflow, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,11 +27,15 @@ import {
   RUN_SIZE,
   type TreeNode,
   type TreePayload,
+  type WorkflowNode,
+  WORKFLOW_SIZE,
+  withWorkflow,
 } from "@/lib/chat-tree";
 import { cn } from "@/lib/utils";
 
 interface ChatNodeData extends Record<string, unknown> {
   node?: TreeNode;
+  workflow?: WorkflowNode;
   count?: number;
   active: boolean;
   selected: boolean;
@@ -41,6 +45,7 @@ interface ChatNodeData extends Record<string, unknown> {
 }
 
 const KIND_COLOR = { vector: "#f59e0b", summary: "#14b8a6" } as const;
+const WORKFLOW_COLOR = "#8b5cf6";
 
 const ROLE_COLOR: Record<string, string> = {
   user: "#3b82f6",
@@ -133,7 +138,28 @@ const ChatNodeView = memo(function ChatNodeView({ data }: NodeProps<Node<ChatNod
   );
 });
 
-const nodeTypes = { chat: ChatNodeView };
+/** One step of the last turn's context workflow (not a chat message). */
+const WorkflowNodeView = memo(function WorkflowNodeView({ data }: NodeProps<Node<ChatNodeData>>) {
+  const w = data.workflow!;
+  return (
+    <div
+      data-testid="minimap-workflow"
+      style={{ ...WORKFLOW_SIZE, borderColor: WORKFLOW_COLOR }}
+      className="overflow-hidden rounded-md border-2 bg-card px-2 py-1 text-left text-[11px] leading-snug"
+    >
+      {handles}
+      <div className="flex items-center gap-1 font-medium" style={{ color: WORKFLOW_COLOR }}>
+        <span className="truncate">{w.label}</span>
+        {w.ms !== undefined ? (
+          <span className="ml-auto shrink-0 text-muted-foreground">{w.ms} ms</span>
+        ) : null}
+      </div>
+      <div className="truncate text-muted-foreground">{w.detail}</div>
+    </div>
+  );
+});
+
+const nodeTypes = { chat: ChatNodeView, workflow: WorkflowNodeView };
 
 /** Frames the end of the active path once per chat; later refetches never move the view. */
 function FocusOnLoad({ focus, chatKey }: { focus: { id: string }[]; chatKey: string }) {
@@ -177,6 +203,7 @@ export function ChatMinimap({
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [wide, setWide] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [showWorkflow, setShowWorkflow] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,16 +230,20 @@ export function ChatMinimap({
     for (const [id, kind] of Object.entries(payload.context ?? {})) {
       if (kind !== "history") keep.add(id);
     }
-    const folded = collapseRuns(payload, keep, expanded);
+    const workflow = showWorkflow ? payload.workflow : undefined;
+    if (workflow) keep.add(workflow.anchor);
+    const base = collapseRuns(payload, keep, expanded);
+    const folded = workflow ? withWorkflow(base, workflow) : base;
     const active = ancestorIds(payload.edges, payload.tips[sessionKey]);
     const flowNodes = layoutTree(folded.nodes, folded.edges).map<Node<ChatNodeData>>((n) => ({
       id: n.id,
-      type: "chat",
+      type: n.kind === "workflow" ? "workflow" : "chat",
       position: { x: n.x, y: n.y },
       draggable: false,
-      ...(n.kind === "run" ? RUN_SIZE : MESSAGE_SIZE),
+      ...(n.kind === "run" ? RUN_SIZE : n.kind === "workflow" ? WORKFLOW_SIZE : MESSAGE_SIZE),
       data: {
         node: n.node,
+        workflow: n.workflow,
         count: n.count,
         active: n.members ? n.members.some((id) => active.has(id)) : active.has(n.id),
         selected: n.id === selectedNodeId,
@@ -229,6 +260,7 @@ export function ChatMinimap({
         stroke: "#94a3b8",
         strokeWidth: 1.5,
         ...(e.type === "BRANCH" ? { strokeDasharray: "5 4" } : {}),
+        ...(e.type === "TRIGGERS" || e.type === "FEEDS" ? { stroke: WORKFLOW_COLOR } : {}),
       },
     }));
     // Start on the end of the active path at a readable zoom; the overview map shows the rest.
@@ -237,8 +269,9 @@ export function ChatMinimap({
       .sort((a, b) => b.position.y - a.position.y)
       .slice(0, 6)
       .map((n) => ({ id: n.id }));
+    if (workflow) focusNodes.push(...workflow.nodes.map((w) => ({ id: w.id })));
     return { nodes: flowNodes, edges: flowEdges, focus: focusNodes };
-  }, [payload, expanded, selectedNodeId, sessionKey]);
+  }, [payload, expanded, selectedNodeId, sessionKey, showWorkflow]);
 
   return (
     <aside
@@ -259,6 +292,16 @@ export function ChatMinimap({
           >
             <MapIcon size={14} />
           </button>
+          {payload?.workflow ? (
+            <button
+              type="button"
+              aria-label={t(showWorkflow ? "thread.chatTree.hideWorkflow" : "thread.chatTree.showWorkflow")}
+              aria-pressed={showWorkflow}
+              onClick={() => setShowWorkflow((v) => !v)}
+            >
+              <Workflow size={14} />
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label={t(wide ? "thread.chatTree.shrink" : "thread.chatTree.expand")}
@@ -277,6 +320,12 @@ export function ChatMinimap({
           <span style={{ color: KIND_COLOR.vector }}>{t("thread.chatTree.kindVector")}</span>{" · "}
           <span style={{ color: KIND_COLOR.summary }}>{t("thread.chatTree.kindSummary")}</span>
           {` · ${t("thread.chatTree.inContext")}`}
+          {showWorkflow && payload.workflow ? (
+            <>
+              {" · "}
+              <span style={{ color: WORKFLOW_COLOR }}>{t("thread.chatTree.workflowStep")}</span>
+            </>
+          ) : null}
         </p>
       ) : null}
       <div className="relative min-h-0 flex-1">
@@ -300,13 +349,14 @@ export function ChatMinimap({
             proOptions={{ hideAttribution: true }}
             onNodeClick={(_, n) => {
               const data = n.data as ChatNodeData;
+              if (data.workflow) return;
               if (data.node) {
                 onSelectNode(data.node, Object.values(payload?.tips ?? {}).includes(data.node.id));
               }
               else setExpanded((prev) => new Set(prev).add(n.id));
             }}
           >
-            <FocusOnLoad focus={focus} chatKey={`${sessionKey}:${wide}`} />
+            <FocusOnLoad focus={focus} chatKey={`${sessionKey}:${wide}:${showWorkflow}`} />
             <Background />
             <Controls showInteractive={false} />
             {showOverview ? (
