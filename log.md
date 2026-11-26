@@ -163,3 +163,6 @@ Newest record last. Each record: timestamp, step, what changed, commit, status.
   - [webui/src/components/MessageBubble.tsx](webui/src/components/MessageBubble.tsx) includes the copy action and a fork/branch control; [webui/src/components/thread/ThreadMessages.tsx](webui/src/components/thread/ThreadMessages.tsx) and related thread UI components handle the fork-from-message flow.
   - [tests/context_graph/test_branching.py](tests/context_graph/test_branching.py) covers multi-branch support, idempotent branch records, round-tripping, and historical fork persistence.
 - **Conclusion**: Phase 2 graph branching requirements are implemented and validated (persistent graph state and fork provenance), not stubbed.
+
+### 2026-11-26: REVIEW-GUIDE.md added
+- [REVIEW-GUIDE.md](REVIEW-GUIDE.md): map of every change vs stock nanobot (baseline `f98784a3`) for the project review. Docs only, no code changed.
